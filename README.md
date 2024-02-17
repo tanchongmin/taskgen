@@ -23,7 +23,7 @@
 
 ## How do I use this? 
 1. Download package via command line ```pip install taskgen-ai```
-2. Set up your OpenAPI API Key. Refer to ```Agent.ipynb``` for how to do it for Jupyter Notebooks.
+2. Set up your OpenAPI API Key
 3. Import the required functions from ```taskgen``` and use them!
 
 # Agent Basics
