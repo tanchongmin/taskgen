@@ -14,7 +14,7 @@
 ### Benefits of JSON messaging over agentic frameworks using conversational free-text like AutoGen
 - JSON format helps do Chain-of-Thought prompting naturally and is less verbose than free text
 - JSON format allows natural parsing of multiple output fields by agents
-- StrictJSON helps to ensure all output fields are there and of the right format required for downstream processing
+- StrictJSON helps to ensure all output fields are there and of the right format required for downstream processing (see StrictJSON.ipynb)
 
 ### Tutorials and Community Support
 - Created: 17 Feb 2024
