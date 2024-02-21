@@ -1,4 +1,4 @@
-# TaskGen v0.0.1
+# TaskGen v0.0.2
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 
@@ -100,7 +100,7 @@ my_agent.status()
     - **external_fn** - Python Function. If defined, instead of using LLM to process the function, we will run the external function. 
         If there are multiple outputs of this function, we will map it to the keys of `output_format` in a one-to-one fashion
     - **fn_name** - String. If provided, this will be the name of the function. Ohterwise, if `external_fn` is provided, it will be the name of `external_fn`. Otherwise, we will use LLM to generate a function name from the `fn_description`
-    - **kwargs** - Dict. Additional arguments you would like to pass on to the strict_json function
+    - **kwargs** - Dict. Additional arguments you would like to pass on to the `strict_json` function
         
 - Outputs:
     JSON of output variables in a dictionary

@@ -1,2 +1,4 @@
+22 Feb 2024 (v0.0.2)
+- Added hierarchical agents
 17 Feb 2024 (v0.0.1)
 - Creation of TaskGen, a task-based agentic framework building on StrictJSON outputs by LLM agents

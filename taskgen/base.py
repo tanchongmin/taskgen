@@ -391,6 +391,11 @@ Update text enclosed in <>. Be concise. Output only the json string without any 
 
             # Use OpenAI to get a response
             res = chat(my_system_prompt, my_user_prompt, **kwargs)
+            
+            # extract only the chunk including the opening and closing braces
+            startindex = res.find('{')
+            endindex = res.rfind('}')
+            res = res[startindex: endindex+1]
 
             # try-catch block to ensure output format is adhered to
             try:

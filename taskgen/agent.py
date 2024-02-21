@@ -2,6 +2,7 @@ import heapq
 import openai
 from openai import OpenAI
 import numpy as np
+import copy
 from .base import *
 
 ### Helper Functions
@@ -77,7 +78,10 @@ class Memory:
 class Agent:
     def __init__(self, agent_name: str = 'Helpful Assistant',
                  agent_description: str = 'A generalist agent meant to help solve problems',
+                 max_subtasks: int = 5,
                  memory = Memory(),
+                 verbose: bool = True,
+                 debug: bool = False,
                  **kwargs):
         ''' 
         Creates an LLM-based agent using description and outputs JSON based on output_format. 
@@ -89,7 +93,10 @@ class Agent:
         Inputs:
         - agent_name: String. Name of agent, hinting at what the agent does
         - agent_description: String. Short description of what the agent does
-        - memory. class Memory. Stores the agent's memory for use for retrieval purposes later (to be implemented)
+        - max_subtasks: Int. The maximum number of subtasks the agent can have
+        - memory: class Memory. Stores the agent's memory for use for retrieval purposes later (to be implemented)
+        - verbose: Bool. Default: True. Whether to print out intermediate thought processes
+        - debug: Bool. Default: Falsee. Whether to debug StrictJSON messages
         
         Inputs (optional):
         - **kwargs: Dict. Additional arguments you would like to pass on to the strict_json function
@@ -97,34 +104,47 @@ class Agent:
         '''
         self.agent_name = agent_name
         self.agent_description = agent_description
-        # start with no tasks
-        self.task = 'No task assigned'
-        self.subtasks_completed = {}
-        self.task_completed = False
+        self.max_subtasks = max_subtasks
+        self.verbose = verbose
+        self.memory = memory
+        
+        self.debug = debug
+        
+        # reset agent's state
+        self.reset()
+        
         self.kwargs = kwargs
         
         # start with default of only llm as the function
         self.function_map = {}
         self.assign_functions([Function(fn_name = 'use_llm', 
-                                        fn_description = 'Queries a Large Language Model to perform the task. Used when no other function can do the task', 
-                                        output_format = {"Output": "Perform the task and show the output"}),
+                                        fn_description = f'Queries a Large Language Model\nUsed only when no other function can do the task', 
+                                        output_format = {"Output": "Output of LLM"}),
                               Function(fn_name = 'end_task',
-                                       fn_description = 'Ends the current task. Used when task has already been fulfilled',
+                                       fn_description = 'Use only when task is completed',
                                        output_format = {})])
         
     ## Generic Functions ##
+    def reset(self):
+        self.task = 'No task assigned'
+        # This is for meta agent's task for hierarchical structure
+        self.overall_task = 'No task assigned'
+        self.subtasks_completed = {}
+        self.task_completed = False
+        
     def query(self, query: str, output_format: dict, provide_function_list: bool = False):
         ''' Queries the agent with a query and outputs in output_format. 
         If you want to provide the agent with the context of functions available to it, set provide_function_list to True (default: False)'''
         
-        system_prompt = f"You are an agent named {self.agent_name} with the following description: {self.agent_description}."
+        system_prompt = f"You are an agent named {self.agent_name} with the following description: ```{self.agent_description}```\n"
         if provide_function_list:
-            system_prompt += f"\nYou have the following Equipped Functions available:\n{self.list_functions()}"
+            system_prompt += f"You have the following Equipped Functions available:\n```{self.list_functions()}```\n"
         system_prompt += query
         
         res = strict_json(system_prompt = system_prompt,
         user_prompt = '',
-        output_format = output_format,
+        output_format = output_format, 
+        verbose = self.debug,
         **self.kwargs)
         return res
     
@@ -160,6 +180,8 @@ class Agent:
 
             # add in the function into the function_map
             self.function_map[stored_fn_name] = function
+            
+        return self
         
     def remove_function(self, function_name: str):
         ''' Removes a function from the agent '''
@@ -177,74 +199,147 @@ class Agent:
         print('\n'.join(functions))
         
     def select_function(self, task: str = ''):
-        ''' Based on the task, output the next function name and input parameters '''
-        res = self.query(query = f"Overall Task: {task}\nProcess the Overall Task using exactly one Equipped Function. For Input Values, output empty dictionary {{}} if use_llm or end_task is selected.",
-                          output_format = {"Equipped Function": "What Equipped Function to use to solve the task", "Input Values": "Input of function in dictionary form of parameter name: value, type: dict"},
-                          provide_function_list = True)
-        
-        # if model decides to use llm, feed the entire task into the llm
-        if res["Equipped Function"] == "use_llm":
-            res["Input Values"] = {"task": task}
-        
-        return res["Equipped Function"], res["Input Values"]
+        ''' Based on the task (without any context), output the next function name and input parameters '''
+        _, function_name, function_params = self.get_next_subtask(task = task)
+            
+        return function_name, function_params
     
-    def use_function(self, function_name: str, function_params: dict):
-        ''' Uses the function '''
+    def use_agent(self, agent_name: str, agent_task: str):
+        ''' Uses an inner agent to do a task for the meta agent. Task outcomes goes directly to subtasks_completed of meta agent '''
+        self.use_function(agent_name, {"instruction": agent_task}, agent_task)
+        
+    def use_function(self, function_name: str, function_params: dict, subtask: str = '', stateful: bool = True):
+        ''' Uses the function. stateful means we store the outcome of the function '''
         if function_name == "use_llm":
-            res = self.query(query = f'Task: {function_params["task"]}\n', 
-                            output_format = {"Task Output": "Perform the task concisely and show the output"},
+            if self.verbose: 
+                print(f'Getting LLM to perform the following task: {function_params["instruction"]}')
+
+            res = self.query(query = f'Context:```{self.overall_task}-{self.subtasks_completed}```\nTask: ```{function_params["instruction"]}\n```', 
+                            output_format = {"Task Outcome": "Generate a full response to the Task within your Agent capabilities."},
                             provide_function_list = False)
-            return res
+            
+            res = res["Task Outcome"]
+            
+            if self.verbose: 
+                print('>', res)
+                print()
+            
         elif function_name == "end_task":
             return
+        
         else:
-            return self.function_map[function_name](**function_params)
+            if self.verbose: 
+                print(f'Calling function {function_name} with parameters {function_params}')
+                
+            res = self.function_map[function_name](**function_params)
+
+            # if only one Output key for the json, then omit the output key
+            if len(res) == 1 and "Output" in res:
+                res = res["Output"]
+            
+            if self.verbose and res != '': 
+                print('>', res)
+                print()
+                
+        if stateful:
+            if res != '':
+                self.subtasks_completed[subtask] = res
+
+        return res
     
     ## Functions for Task Solving ##
-    def assign_task(self, task: str):
-        ''' Assigns a new task to this agent, and reset subtasks completed list '''
+    def assign_task(self, task: str, overall_task: str = ''):
+        ''' Assigns a new task to this agent. Also treats this as the meta agent now that we have a task assigned '''
         self.task = task
-        self.subtasks_completed = {}
-        self.task_completed = False
+        self.overall_task = task
+        if overall_task != '':
+            self.overall_task = overall_task
         
-    def get_next_subtask(self):
+    def get_next_subtask(self, task = ''):
         ''' Based on what the task is and the subtasks completed, we get the next subtask, function and input parameters'''
+        if task == '':
+            background_info = f"Assigned Task:```{self.task}```\nAction History: ```{self.subtasks_completed}```\n"
+        else:
+            background_info = f"Assigned Task:```{task}```"
         
-        res = self.query(query = f"Overall Task: {self.task}\nCompleted Steps: {self.subtasks_completed.keys()}\nSuggest the next step for the Large Language Model to do to complete the task. Ensure that the next step fulfils a manageable part of the overall task and can be processed by exactly one Equipped Function. If task is completed, call end_task. For Input Values, output empty dictionary {{}} if use_llm or end_task is selected.",
-                          output_format = {"Next Step": "Describe what to do for next step", "Equipped Function": "What Equipped Function to use for next step", "Input Values": "Input of function in dictionary form of parameter name: value, type: dict"},
+        res = self.query(query = f'''\n{background_info}First create an Overall Plan with a list of steps to do Assigned Task from beginning to end, including uncompleted steps. Then, generate the Next Step to fulfil the Assigned Task. Check that the Next Step can be processed by exactly one Equipped Function. If Overall Plan has been completed, call end_task''',
+                         output_format = {"Thoughts": "How to do Assigned Task", "Overall Plan": "List of steps to complete Assigned Task from beginning to end, type: list", "Reflection": "Reflect on progress", "Overall Plan Completed": "List [] of steps in Overall Plan that are completed, type: list", "Next Step": "Describe what to do for next step without mentioning the Equipped Function", "Equipped Function": "What Equipped Function to use for next step", "Equipped Function Input": "Input for the Equipped Function in the form of {'input_parameter': 'input_value'} for each 'input_parameter' in Input, type: dict"},
                           provide_function_list = True)
+            
+        # default just use llm
+        if res['Equipped Function'] not in self.function_map:
+            res['Equipped Function'] = 'use_llm'
+            
+        # if task completed, then end it
+        if res['Overall Plan'] == res['Overall Plan Completed'] and len(res['Overall Plan']) > 0:
+            res['Equipped Function'] = 'end_task'
+            
+        # if no plan, do not end yet
+        if res['Overall Plan'] == [] and res['Equipped Function'] == 'end_task':
+            res['Equipped Function'] = 'use_llm'
+        
+        # if use_llm or end_task is in the Equipped Function, just make it use_llm or end_task
+        if 'use_llm' in res['Equipped Function']: 
+            res['Equipped Function'] = 'use_llm'
+        if 'end_task' in res['Equipped Function']: 
+            res['Equipped Function'] = 'end_task'
         
         # if the next step is already done before, that will be treated the same way as end_task
         if res["Next Step"] in self.subtasks_completed:
             res["Equipped Function"] = "end_task"
-        return res["Next Step"], res["Equipped Function"], res["Input Values"]
-    
-    def step(self, verbose = True):
-        ''' Performs a single step of the task using LLM and available functions '''
-        return self.run(task = '', num_steps = 1, verbose = verbose)[-1]
-    
-    def reply_user(self, verbose = True):
-        ''' Generate a reply to the user based on the task and subtasks completed '''
-        res = strict_json(system_prompt = f"Respond to the User Task using only the information from the subtasks. Subtasks: {self.subtasks_completed.items()}\n",
-                          user_prompt = self.task,
-                          output_format = {"Response to User": "Answer the user"},
-                          **self.kwargs)
         
-        return res["Response to User"]
+        # format the parameters if it is blank
+        if res["Equipped Function Input"] == {}:
+            res["Equipped Function Input"] = {"instruction": res["Next Step"]}
+            
+        return res["Next Step"], res["Equipped Function"], res["Equipped Function Input"]
+    
+    def summarise_subtasks_completed(self, task: str = ''):
+        ''' Summarise the subtasks_completed list according to task '''
 
-    def run(self, task: str = '', num_steps: int = 5, verbose = True) -> list:
-        ''' Attempts to do the task using LLM and available functions
-        Loops through and performs either a function call or LLM call num_steps number of times
-        verbose determines whether we print out the agent's thought process when doing the task
-        Returns list of outputs for each substep'''
+        output = self.reply_user(task)
+        # Create a new summarised subtasks completed list
+        self.subtasks_completed = {"Summary": output}
         
-        # check if we need to assign a new task
+    def reply_user(self, task: str = '', stateful: bool = False):
+        ''' Generate a reply to the user based on the task and subtasks completed
+        If stateful, also store this interaction into the subtasks_completed'''
+        
+        my_task = self.task if task == '' else task
+            
+        res = self.query(query = f'Context: ```{self.subtasks_completed}```\nTask: ```{my_task}```\n', 
+                                    output_format = {"Task Outcome": "Generate a response to the Task within your Agent capabilities. Use the Context as ground truth."},
+                                    provide_function_list = False)
+        
+        res = res["Task Outcome"]
+        
+        if stateful:
+            self.subtasks_completed[my_task] = res
+        
+        return res
+
+    def run(self, task: str = '', overall_task: str = '', num_subtasks: int = 0) -> list:
+        ''' Attempts to do the task using LLM and available functions
+        Loops through and performs either a function call or LLM call up to max_steps number of times
+        If overall_task is filled, then we store it to pass to the inner agents for more context
+        reset = True means that we reset the agent's metadata
+        Returns list of outputs for each substep'''
+            
+        # Assign the task
         if task != '':
-            self.assign_task(task)
+            # If meta agent's task is here as well, assign it too
+            if overall_task != '':
+                self.assign_task(task, overall_task)
+            else:
+                self.assign_task(task)
+            
+        # check if we need to override num_steps
+        if num_subtasks == 0:
+            num_subtasks = self.max_subtasks
         
         # if task completed, then exit
         if self.task_completed: 
-            if verbose:
+            if self.verbose:
                 print('Task already completed!\n')
                 print('Subtasks completed:')
                 for key, value in self.subtasks_completed.items():
@@ -252,79 +347,71 @@ class Agent:
                     
         else:
             # otherwise do the task
-            for _ in range(num_steps):           
+            for _ in range(num_subtasks):           
                 # Determine next subtask, or if task is complete
                 subtask, function_name, function_params = self.get_next_subtask()
                 if function_name == 'end_task':
                     self.task_completed = True
-                    if verbose:
+                    if self.verbose:
                         print('Task completed successfully!\n')
                     break
                     
-                if verbose: print('Subtask identified:', subtask)
+                if self.verbose: print('Subtask identified:', subtask)
 
                 # Execute the function for next step
-                if function_name == "use_llm":
-                    if verbose: 
-                        print(f'Getting LLM to perform the following task: {subtask}')
-                    res = self.query(query = f'Overall context: {self.task}\nCompleted subtasks: {self.subtasks_completed.items()}\nTask: {subtask}\n', 
-                                    output_format = {"Task Output": "Perform the task concisely and show the output"},
-                                    provide_function_list = False)
-                    summary_msg = res["Task Output"]
-
-                else:
-                    if verbose: 
-                        print(f'Calling function {function_name} with parameters {function_params}')
-                    res = self.use_function(function_name, function_params)
-                    summary_msg = f'Output of {function_name} with input {function_params}: {res}'
-
-                if verbose: 
-                        print(summary_msg, end = '\n\n')
-                        
-                # add in subtask result into subtasks_completed dictionary
-                self.subtasks_completed[subtask] = summary_msg
-                
-
+                res = self.use_function(function_name, function_params, subtask)
+                         
             # check if overall task is complete at the last step if num_steps > 1
             if not self.task_completed:
                 subtask, function_name, function_params = self.get_next_subtask()
                 if function_name == "end_task":
                     self.task_completed = True
-                    if verbose:
+                    if self.verbose:
                         print('Task completed successfully!\n')
                                   
         return list(self.subtasks_completed.values())
-                                  
-## TODO ##
-class TaskGroup:
-    ''' This defines a task group that can be used to solve a task'''
-    def __init__(self, task = 'Summarise the news', 
-                 agent_pool = [Agent('Summariser', 'Summarises information'), 
-                               Agent('Writer', 'Writes news articles'), 
-                               Agent('General', 'A generalist agent')],
-                conversation_history = [],
-                task_progress = [],
-                round_robin = False):
-        '''
-        task: Str. The current task to solve
-        agent_pool: List[Agent]. The available agents that we have
-        conversation_history: List[Dict]. The past outputs of the agents in JSON Dict.
-        task_progress: List[Dict]. The progress of the task, with what has been done at each step stored in a dictionary
-        round_robin: Bool (Default: False). Whether or not to call each agent one by one'''
-        
-        self.task = task
-        self.task_progress = task_progress
-        self.agent_pool = agent_pool
-        self.conversation_history = conversation_history
-        self.round_robin = round_robin
-        
-    def next_subtask(self, task: str, task_progress: list):
-        ''' Takes in the task and task progress, and returns the next subtask and agent needed to solve the task
-        Returns also whether the task is completed'''
-        pass
+    
+    ## This is for Multi-Agent uses
+    def to_function(self, meta_agent):
+        ''' Converts the agent to a function so that it can be called by another agent
+        The agent will take in an instruction, and output the result after processing'''
 
-            
-    def step(self):
-        ''' Does one step of the task '''
-        # 
-        pass
+        # makes the agent appear as a function that takes in an instruction and outputs the executed instruction
+        my_fn = Function(fn_name = self.agent_name,
+                             fn_description = f'Agent Description: ```{self.agent_description}```\nExecutes the given <instruction>',
+                             output_format = {"Output": "Output of instruction"},
+                             external_fn = Agent_External_Function(self, meta_agent))
+        
+        return my_fn
+    
+    def assign_agents(self, agent_list: list):
+        ''' Assigns a list of Agents to the main agent, passing in the meta agent as well '''
+        if not isinstance(agent_list, list):
+            agent_list = [agent_list]
+        self.assign_functions([agent.to_function(self) for agent in agent_list])
+        return self
+    
+class Agent_External_Function:
+    ''' Creates a Function-based version of the agent '''
+    def __init__(self, agent: Agent, meta_agent: Agent):
+        ''' Retains the instance of the agent as an internal variable '''
+        self.agent = agent
+        self.meta_agent = meta_agent
+
+    def __call__(self, instruction: str):
+        ''' Returns what the agent did overall to fulfil the instruction '''
+        # make a deep copy so we do not affect the original agent
+        if self.agent.verbose:
+            print(f'\n### Start of Inner Agent: {self.agent.agent_name} ###')
+        agent_copy = copy.deepcopy(self.agent)
+        
+        # provide the subtasks completed and debug capabilities to the inner agents too
+        agent_copy.debug = self.meta_agent.debug
+        agent_copy.subtasks_completed = self.meta_agent.subtasks_completed
+
+        output = agent_copy.run(instruction, self.meta_agent.overall_task)
+        if self.agent.verbose:
+            print(f'### End of Inner Agent: {self.agent.agent_name} ###')
+        
+        return ''
+                             
