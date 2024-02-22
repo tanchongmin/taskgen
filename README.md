@@ -5,9 +5,9 @@
 ### TaskGen functionalities (see Agent.ipynb)
 - Task-based Agents which will break down tasks into subtasks and solve them in bite-sized portions
 - Agents with registered functions as skills
+- Hierarchical Agents
 
 ### Upcoming Agent Functionalities (coming soon!)
-- Multiple agents in a Task Group
 - Retrieval Augmented Generation (RAG) - based selection of functions (to be added)
 - RAG-based selection of memory of few-shot examples of how to use functions and how to perform task based on similar tasks done in the past (to be added)
 
