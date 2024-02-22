@@ -118,7 +118,7 @@ class Agent:
         # start with default of only llm as the function
         self.function_map = {}
         self.assign_functions([Function(fn_name = 'use_llm', 
-                                        fn_description = f'Queries a Large Language Model\nUsed only when no other function can do the task', 
+                                        fn_description = f'Used only when no other function can do the task', 
                                         output_format = {"Output": "Output of LLM"}),
                               Function(fn_name = 'end_task',
                                        fn_description = 'Use only when task is completed',
@@ -214,8 +214,8 @@ class Agent:
             if self.verbose: 
                 print(f'Getting LLM to perform the following task: {function_params["instruction"]}')
 
-            res = self.query(query = f'Context:```{self.overall_task}-{self.subtasks_completed}```\nTask: ```{function_params["instruction"]}\n```', 
-                            output_format = {"Task Outcome": "Generate a full response to the Task within your Agent capabilities."},
+            res = self.query(query = f'Context:```{self.overall_task}-{self.subtasks_completed}```\nTask: ```{function_params["instruction"]}```\nPerform the task - do not just comment on how you can do the task - do it out fully within your Agent Capabilities', 
+                            output_format = {"Task Outcome": "Generate a full response to the Task"},
                             provide_function_list = False)
             
             res = res["Task Outcome"]
@@ -254,15 +254,18 @@ class Agent:
         self.overall_task = task
         if overall_task != '':
             self.overall_task = overall_task
+            
+        self.task_completed = False
         
-    def get_next_subtask(self, task = ''):
-        ''' Based on what the task is and the subtasks completed, we get the next subtask, function and input parameters'''
+    def get_next_subtask(self, task = '', force: bool = False):
+        ''' Based on what the task is and the subtasks completed, we get the next subtask, function and input parameters
+        force means we will definitely do something other than end_task'''
         if task == '':
             background_info = f"Assigned Task:```{self.task}```\nAction History: ```{self.subtasks_completed}```\n"
         else:
             background_info = f"Assigned Task:```{task}```"
         
-        res = self.query(query = f'''\n{background_info}First create an Overall Plan with a list of steps to do Assigned Task from beginning to end, including uncompleted steps. Then, generate the Next Step to fulfil the Assigned Task. Check that the Next Step can be processed by exactly one Equipped Function. If Overall Plan has been completed, call end_task''',
+        res = self.query(query = f'''\n{background_info}First create an Overall Plan with a list of steps to do Assigned Task from beginning to end, including uncompleted steps. Then, reflect on Action History to see what steps in Overall Plan are already completed. Then, generate the Next Step to fulfil the Assigned Task. Check that the Next Step can be processed by exactly one Equipped Function. If Overall Plan has been completed, call end_task''',
                          output_format = {"Thoughts": "How to do Assigned Task", "Overall Plan": "List of steps to complete Assigned Task from beginning to end, type: list", "Reflection": "Reflect on progress", "Overall Plan Completed": "List [] of steps in Overall Plan that are completed, type: list", "Next Step": "Describe what to do for next step without mentioning the Equipped Function", "Equipped Function": "What Equipped Function to use for next step", "Equipped Function Input": "Input for the Equipped Function in the form of {'input_parameter': 'input_value'} for each 'input_parameter' in Input, type: dict"},
                           provide_function_list = True)
             
@@ -284,37 +287,51 @@ class Agent:
         if 'end_task' in res['Equipped Function']: 
             res['Equipped Function'] = 'end_task'
         
-        # if the next step is already done before, that will be treated the same way as end_task
+        # if the next step is already done before, then end the task
         if res["Next Step"] in self.subtasks_completed:
             res["Equipped Function"] = "end_task"
+            
+        # the first pass we should output something if force is activated
+        if force and res['Equipped Function'] == 'end_task':
+            res['Equipped Function'] = 'use_llm'
         
-        # format the parameters if it is blank
-        if res["Equipped Function Input"] == {}:
+        # format the parameters if it is blank or use_ll 
+        if res["Equipped Function Input"] == {} or res['Equipped Function'] == 'use_llm':
             res["Equipped Function Input"] = {"instruction": res["Next Step"]}
             
         return res["Next Step"], res["Equipped Function"], res["Equipped Function Input"]
     
+    def remove_last_subtask(self):
+        ''' Removes last subtask in subtask completed. Useful if you want to retrace a step '''
+        if len(self.subtasks_completed) > 0:
+            removed_item = self.subtasks_completed.popitem()
+        if self.verbose:
+            print(f'Removed last subtask from subtasks_completed: {removed_item}')
+        
     def summarise_subtasks_completed(self, task: str = ''):
         ''' Summarise the subtasks_completed list according to task '''
 
         output = self.reply_user(task)
         # Create a new summarised subtasks completed list
-        self.subtasks_completed = {"Summary": output}
+        self.subtasks_completed = {f"Summary of {task}": output}
         
-    def reply_user(self, task: str = '', stateful: bool = False):
-        ''' Generate a reply to the user based on the task and subtasks completed
+    def reply_user(self, query: str = '', stateful: bool = True):
+        ''' Generate a reply to the user based on the query / agent task and subtasks completed
         If stateful, also store this interaction into the subtasks_completed'''
         
-        my_task = self.task if task == '' else task
+        my_query = self.task if query == '' else query
             
-        res = self.query(query = f'Context: ```{self.subtasks_completed}```\nTask: ```{my_task}```\n', 
+        res = self.query(query = f'Context: ```{self.subtasks_completed}```\nTask: ```{my_query}```\n', 
                                     output_format = {"Task Outcome": "Generate a response to the Task within your Agent capabilities. Use the Context as ground truth."},
                                     provide_function_list = False)
         
         res = res["Task Outcome"]
         
+        if self.verbose:
+            print(res)
+        
         if stateful:
-            self.subtasks_completed[my_task] = res
+            self.subtasks_completed[my_query] = res
         
         return res
 
@@ -327,6 +344,7 @@ class Agent:
             
         # Assign the task
         if task != '':
+            self.task_completed = False
             # If meta agent's task is here as well, assign it too
             if overall_task != '':
                 self.assign_task(task, overall_task)
@@ -347,9 +365,9 @@ class Agent:
                     
         else:
             # otherwise do the task
-            for _ in range(num_subtasks):           
-                # Determine next subtask, or if task is complete
-                subtask, function_name, function_params = self.get_next_subtask()
+            for i in range(num_subtasks):           
+                # Determine next subtask, or if task is complete. Always execute if it is the first subtask
+                subtask, function_name, function_params = self.get_next_subtask(force = (i==0))
                 if function_name == 'end_task':
                     self.task_completed = True
                     if self.verbose:
