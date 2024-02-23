@@ -30,7 +30,7 @@
 - Create an agent by entering your agent's name and description
 - Agents are task-based, so they will help generate subtasks to fulfil your main task
 
-- Agents are made to be non-verbose, so they will just focus only on task instruction
+- Agents are made to be non-verbose, so they will just focus only on task instruction (Much more efficient compared to conversational-based agentic frameworks like AutoGen)
     
 ## Example Agent Creation
 ```python
@@ -149,16 +149,40 @@ output = my_agent.run('Generate me a happy sentence with a number and a ball. Th
 ```
 
 `Subtask identified: Convert the binary number 1001 to decimal`
-
 `Calling function binary_to_decimal with parameters {'x': '1001'}`
 
-`Output of binary_to_decimal with input {'x': '1001'}: {'output1': 9}`
+> {'output1': 9}
 
-`Subtask identified: Generate a happy sentence with the number 1001 and a ball`
+`Subtask identified: Generate a happy sentence with the decimal number and a ball`
+`Calling function sentence_with_objects_entities_emotion with parameters {'obj': '9', 'entity': 'ball', 'emotion': 'happy'}`
 
-`Calling function generate_sentence_with_emotion with parameters {'obj': 'number 1001', 'entity': 'ball', 'emotion': 'happy'}`
-
-`Output of generate_sentence_with_emotion with input {'obj': 'number 1001', 'entity': 'ball', 'emotion': 'happy'}: {'output': 'I am overjoyed to have found number 1001 ball!'}`
+> {'output': 'I am so happy with my 9 balls.'}
 
 `Task completed successfully!`
 
+# Inception: Agents within Agents
+- You can also create a Meta Agent that uses other Agents (referred to as Inner Agents) as functions
+- Create your Meta agent using `Agent()` (Note: No different from usual process of creating Agents - your Meta Agent is also an Agent)
+- set up an Inner Agent list and assign it to your Meta agent using `assign_agents(agent_list)`
+
+## Example Meta Agent Setup
+```python
+# Define your meta-agent
+my_agent = Agent('Menu Creator', 
+                 'Creates a menu for a restaurant. Menu item includes Name, Description, Ingredients, Pricing.')
+
+# Define your agent list. Note you can just assign functions to the agent in place using .assign_functions(function_list)
+agent_list = [Agent('Chef', 'Takes in dish names and comes up with ingredients for each of them. Does not generate prices.'),
+    Agent('Boss', 'Takes in menu items and curates them according to price'),
+    Agent('Creative Writer', 'Takes in a cuisine type and generates interesting dish names and descriptions. Does not generate prices or ingredients.', max_subtasks = 2),
+    Agent('Economist', 'Takes in dish names and comes up with fictitious pricing for each of them')
+    ]
+
+my_agent.assign_agents(agent_list)
+```
+
+## Run the Meta Agent
+- Let us run the agent and see the interactions between the Meta Agent and Inner Agents to solve the task!
+```python
+output = my_agent.run('Give me 5 menu items with name, description, ingredients and price based on Italian food choices.')
+```
