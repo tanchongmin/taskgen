@@ -2,10 +2,10 @@
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 
-### TaskGen functionalities (see Agent.ipynb)
+### TaskGen functionalities
 - Task-based Agents which will break down tasks into subtasks and solve them in bite-sized portions
 - Agents with registered functions as skills
-- Hierarchical Agents
+- Hierarchical Agents which can call other Agents as functions
 
 ### Upcoming Agent Functionalities (coming soon!)
 - Retrieval Augmented Generation (RAG) - based selection of functions (to be added)
@@ -29,7 +29,6 @@
 # Agent Basics
 - Create an agent by entering your agent's name and description
 - Agents are task-based, so they will help generate subtasks to fulfil your main task
-
 - Agents are made to be non-verbose, so they will just focus only on task instruction (Much more efficient compared to conversational-based agentic frameworks like AutoGen)
     
 ## Example Agent Creation
