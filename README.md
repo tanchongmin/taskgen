@@ -45,17 +45,17 @@ output = my_agent.run('Give me 5 words rhyming with cool, and make a 4-sentence 
 
 `Subtask identified: Find 5 words that rhyme with 'cool'
 Getting LLM to perform the following task: Find 5 words that rhyme with 'cool'
-pool, rule, fool, tool, school`
+> pool, rule, fool, tool, school`
 
 `Subtask identified: Compose a 4-sentence poem using the words 'pool', 'rule', 'fool', 'tool', and 'school'
 Getting LLM to perform the following task: Compose a 4-sentence poem using the words 'pool', 'rule', 'fool', 'tool', and 'school'
-In the school, the golden rule is to never be a fool. Use your mind as a tool, and always follow the pool.`
+> In the school, the golden rule is to never be a fool. Use your mind as a tool, and always follow the pool.`
 
 `Task completed successfully!`
 
 ## Example Agent Reply to User - Reference the subtasks' output to answer the user's query
 ```python
-print(my_agent.reply_user())
+output = my_agent.reply_user()
 ```
 
 `
