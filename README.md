@@ -162,7 +162,7 @@ output = my_agent.run('Generate me a happy sentence with a number and a ball. Th
 # Inception: Agents within Agents
 - You can also create a Meta Agent that uses other Agents (referred to as Inner Agents) as functions
 - Create your Meta agent using `Agent()` (Note: No different from usual process of creating Agents - your Meta Agent is also an Agent)
-- set up an Inner Agent list and assign it to your Meta agent using `assign_agents(agent_list)`
+- Set up an Inner Agent list and assign it to your Meta agent using `assign_agents(agent_list)`
 
 ## Example Meta Agent Setup
 ```python
