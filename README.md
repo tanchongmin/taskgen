@@ -38,8 +38,19 @@ my_agent = Agent('Helpful assistant', 'You are a generalist agent')
 
 ## Example Agent Task Running - Split the assigned task into subtasks and execute each of them
 
+Using standard run
 ```python
+# Using standard run
 output = my_agent.run('Give me 5 words rhyming with cool, and make a 4-sentence poem using them')
+```
+
+Using Agent Memory and RAG
+```python
+# Manually adding memories
+my_agent.memory.memory.append("Rhyming words: cool, pool, fool, drool, school")
+
+# Using run with RAG
+output = my_agent.run_with_rag('What are the rhyming words for the word "cool"?')
 ```
 
 `Subtask identified: Find 5 words that rhyme with 'cool'`
@@ -187,3 +198,19 @@ my_agent.assign_agents(agent_list)
 ```python
 output = my_agent.run('Give me 5 menu items with name, description, ingredients and price based on Italian food choices.')
 ```
+
+# Contributing to the project
+
+## Test locally
+1. Clone the repository
+2. If using a virtual environment, activate it
+3. `cd` into taskgen repository
+4. Install the package via command line `pip install -e .`
+5. Now you can import the package and use it in your code
+
+## Submitting a pull request
+1. Fork the repository
+2. Create a new branch
+3. Make your changes
+4. Push your changes to your fork
+5. Submit a pull request

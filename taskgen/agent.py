@@ -74,6 +74,11 @@ class Memory:
     def clear_memory(self):
         ''' Clears all memory '''
         self.memory = []
+    def retrieve_similar(self, query, top_k=3):
+        '''Retrieves top_k similar memories based on the query'''
+        scores = [self.ranker(query, memory_item) for memory_item in self.memory]
+        top_k_indices = top_k_index(scores, top_k)
+        return [self.memory[i] for i in top_k_indices]
     
 class Agent:
     def __init__(self, agent_name: str = 'Helpful Assistant',
@@ -132,6 +137,17 @@ class Agent:
         self.subtasks_completed = {}
         self.task_completed = False
         
+    def run_with_rag(self, task: str, top_k_memory=3):
+        '''Runs the task with Retrieval Augmented Generation'''
+        # Retrieve similar memories
+        similar_memories = self.memory.retrieve_similar(task, top_k=top_k_memory)
+        
+        # Combine memories with the task for context
+        task_with_context = f"{task}. Relevant information: {'; '.join(similar_memories)}"
+        
+        # Proceed with the task as usual using the augmented task description
+        return self.run(task_with_context)
+
     def query(self, query: str, output_format: dict, provide_function_list: bool = False):
         ''' Queries the agent with a query and outputs in output_format. 
         If you want to provide the agent with the context of functions available to it, set provide_function_list to True (default: False)'''
@@ -416,7 +432,7 @@ class Agent_External_Function:
         self.agent = agent
         self.meta_agent = meta_agent
 
-    def __call__(self, instruction: str):
+    def __call__(self, instruction: str, use_rag=False, top_k_memory=3):
         ''' Returns what the agent did overall to fulfil the instruction '''
         # make a deep copy so we do not affect the original agent
         if self.agent.verbose:
@@ -427,9 +443,14 @@ class Agent_External_Function:
         agent_copy.debug = self.meta_agent.debug
         agent_copy.subtasks_completed = self.meta_agent.subtasks_completed
 
-        output = agent_copy.run(instruction, self.meta_agent.overall_task)
-        if self.agent.verbose:
-            print(f'### End of Inner Agent: {self.agent.agent_name} ###')
+        # Decide whether to use run or run_with_rag based on the use_rag flag
+        if use_rag:
+            output = agent_copy.run_with_rag(instruction, top_k_memory=top_k_memory)
+        else:
+            output = agent_copy.run(instruction, self.meta_agent.overall_task)
         
-        return ''
+        if self.agent.verbose:
+            print(f'### End of Inner Agent: {self.agent.agent_name} ###\n')
+        
+        return output
                              
