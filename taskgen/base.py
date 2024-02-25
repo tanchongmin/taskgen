@@ -4,6 +4,7 @@ import json
 import re
 import ast
 import copy
+import inspect
 from openai import OpenAI
 
 ### Helper Functions ###
@@ -158,9 +159,9 @@ def check_datatype(field, key: dict, data_type: str, **kwargs):
         # check for bool
         if data_type.lower() == 'bool':
             field = str(field)
-            if field[:4].lower() == 'true':
+            if 'true' == field[:4].lower():
                 field = True
-            elif field[:5].lower() == 'false':
+            elif 'false' == field[:5].lower():
                 field = False
             else:
                 raise Exception(f'Output field of "{key}" not of data type {data_type}. If not possible to match, output True')
@@ -168,7 +169,16 @@ def check_datatype(field, key: dict, data_type: str, **kwargs):
         # check for dict
         if data_type[:4].lower() == 'dict':
             if not isinstance(field, dict):
-                raise Exception(f"Output field of {key} not of data type dict. If not possible to match, rephrase output field into dictionary with attribute names as key and attribute description as value")
+                # first try to see if we can do ast.literal_eval with { and }
+                try:
+                    startindex = field.find('{')
+                    endindex = field.rfind('}')
+                    field = field[startindex: endindex+1]
+                    field = ast.literal_eval(field)
+                    assert(isinstance(field, dict))
+                except Exception as e:
+                    raise Exception(f"Output field of {key} not of data type dict. If not possible to match, rephrase output field into dictionary with attribute names as key and attribute description as value")
+                
             # if we define more things in dict, evaluate those
             if len(data_type) > 4:
                 try:
@@ -211,6 +221,9 @@ def check_key(field: str, output_format, new_output_format, delimiter: str, deli
             
         # after creating dictionary, step into next layer
         for key, value in output_d.items():
+            # if the output is a bool type, convert true and false into True and False for ast.literal_eval parsing
+            if 'bool' in output_format[key].split('type:')[-1]:
+                value = value.replace('true','True').replace('false','False')
             output_d[key] = check_key(value, output_format[key], new_output_format[cur_delimiter+key+cur_delimiter], delimiter, delimiter_num+1)
             # after stepping back from the later layers back to present layer, check for types
             if 'type:' in output_format[key]:             
@@ -467,13 +480,21 @@ class Function:
         self.kwargs = kwargs
         
         self.variable_names = []
+        self.shared_variable_names = []
         # use regex to extract variables from function description
         matches = re.findall(r'<(.*?)>', self.fn_description)
 
         for match in matches:
             first_half = match.split(':')[0]
             if first_half not in self.variable_names:
-                self.variable_names.append(first_half)
+                # if the first two characters of variable are s_, means take from shared_variables
+                if first_half[:2] != 's_':
+                    self.variable_names.append(first_half)
+                # otherwise we take from shared_variables
+                else:
+                    self.shared_variable_names.append(first_half)
+                    # replace the original variable without the <> so as not to confuse the LLM
+                    self.fn_description = self.fn_description.replace(f'<{match}>', first_half)
                 
         # generate function name if not defined
         if self.fn_name is None:
@@ -502,14 +523,26 @@ class Function:
         ''' Describes the function, and inputs the relevant parameters as either unnamed variables (args) or named variables (kwargs)
         
         Inputs:
+        - shared_varables: Dict. Default: empty dict. The variables which will be shared between functions. Only passed in if required by function 
         - *args: Tuple. Unnamed input variables of the function. Will be processed to var1, var2 and so on based on order in the tuple
         - **kwargs: Dict. Named input variables of the function. Can also be variables to pass into strict_json
         
         Output:
         - res: Dict. JSON containing the output variables'''
         
-        # extract out only variables listed in variable_list
+        # get the shared_variables if there are any
+        shared_variables = kwargs.get('shared_variables', {})
+        # remove the mention of shared_variables in kwargs
+        if 'shared_variables' in kwargs:
+            del kwargs['shared_variables']
+        
+        # extract out only variables listed in variable_list from kwargs
         function_kwargs = {my_key: kwargs[my_key] for my_key in kwargs if my_key in self.variable_names}
+        # additionally, if function references something in shared_variables, add that in
+        for variable in self.shared_variable_names:
+            if variable in shared_variables:
+                function_kwargs[variable] = shared_variables[variable]
+        
         # extract out only variables not listed in variable list
         strict_json_kwargs = {my_key: kwargs[my_key] for my_key in kwargs if my_key not in self.variable_names}
         
@@ -524,21 +557,39 @@ class Function:
         if self.external_fn is None:
             res = strict_json(system_prompt = self.fn_description,
                             user_prompt = function_kwargs,
-                            output_format = self.output_format, 
+                            output_format = self.output_format,
                             **self.kwargs, **strict_json_kwargs)
             
         # Else run the external function
         else:
             res = {}
-            fn_output = self.external_fn(**function_kwargs)
-            output_keys = list(self.output_format.keys())
-            # convert the external function into a tuple format to parse it through the JSON dictionary output format
-            if not isinstance(fn_output, tuple):
-                fn_output = [fn_output]
-            
-            for i in range(len(fn_output)):
-                res[output_keys[i]] = fn_output[i]
+            # if external function uses shared_variables, pass it in
+            argspec = inspect.getfullargspec(self.external_fn)
+            if 'shared_variables' in argspec.args:
+                fn_output = self.external_fn(shared_variables = shared_variables, **function_kwargs)
+            else:
+                fn_output = self.external_fn(**function_kwargs)
                 
+            # if there is nothing in fn_output, skip this part
+            if fn_output is not None:
+                output_keys = list(self.output_format.keys())
+                # convert the external function into a tuple format to parse it through the JSON dictionary output format
+                if not isinstance(fn_output, tuple):
+                    fn_output = [fn_output]
+
+                for i in range(len(fn_output)):
+                    res[output_keys[i]] = fn_output[i]
+        
+        # check if any of the output variables have a s_, which means we update the shared_variables and not output it
+        keys = list(res.keys())
+        for each in keys:
+            if each[:2] == 's_':
+                shared_variables[each] = res[each]
+                del res[each]
+                
+        if res == {}:
+            res = {'Status': 'Completed'}
+
         return res
     
 ### Legacy Support ###

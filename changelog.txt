@@ -1,3 +1,9 @@
+25 Feb 2024 (v0.0.4)
+- Added shared variables, enabling a pool of shared variables to persist between functions for better handling of non-text modalities as well as long text
+- Refined the prompt for get_next_subtask() in order to do element by element check of whether the Overall Plan is completed
+- Changed the dictionary parsing of StrictJSON to ensure that we extract the leftmost and rightmost { and } respectively to do ast.literal_eval. Previously might have the quotation marks at the left and right which affected parsing
+- Changed the bool parsing of StrictJSON to convert true/false to True/False first so as to make it parseable by ast.literal_eval
+
 22 Feb 2024 (v0.0.3)
 - Added hierarchical agents
 - Refined prompts for use_llm and reply_user
