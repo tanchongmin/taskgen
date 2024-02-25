@@ -1,4 +1,4 @@
-# TaskGen v0.0.3
+# TaskGen v0.0.4
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 
@@ -6,6 +6,7 @@
 - Task-based Agents which will break down tasks into subtasks and solve them in bite-sized portions
 - Agents with registered functions as skills
 - Hierarchical Agents which can call other Agents as functions
+- Shared Variables between functions to handle non-text modalities as well as very long text
 
 ### Upcoming Agent Functionalities (coming soon!)
 - Retrieval Augmented Generation (RAG) - based selection of functions (to be added)
@@ -173,7 +174,8 @@ my_agent = Agent('Menu Creator',
                  'Creates a menu for a restaurant. Menu item includes Name, Description, Ingredients, Pricing.')
 
 # Define your agent list. Note you can just assign functions to the agent in place using .assign_functions(function_list)
-agent_list = [Agent('Chef', 'Takes in dish names and comes up with ingredients for each of them. Does not generate prices.'),
+agent_list = [
+    Agent('Chef', 'Takes in dish names and comes up with ingredients for each of them. Does not generate prices.'),
     Agent('Boss', 'Takes in menu items and curates them according to price'),
     Agent('Creative Writer', 'Takes in a cuisine type and generates interesting dish names and descriptions. Does not generate prices or ingredients.', max_subtasks = 2),
     Agent('Economist', 'Takes in dish names and comes up with fictitious pricing for each of them')
@@ -186,4 +188,57 @@ my_agent.assign_agents(agent_list)
 - Let us run the agent and see the interactions between the Meta Agent and Inner Agents to solve the task!
 ```python
 output = my_agent.run('Give me 5 menu items with name, description, ingredients and price based on Italian food choices.')
+```
+
+# Shared Variables
+
+*"Because text is not enough"* - Anonymous
+
+- `shared_variables` is a dictionary, that is initialised in Agent (default empty dictionary), and can be referenced by any function of the agent (including Inner Agents and their functions)
+- This can be useful for non-text modalitiies (e.g. audio, pdfs, image) and lengthy text modalities, which we do not want to output into `subtasks_completed` directly
+- `s_` at the start of the variable names means shared variables
+    - For input, it means we take the variable from `shared_variables` instead of LLM generated input
+    - For output, it means we store the variable into `shared_variables` instead of storing it in `subtasks_completed`. If `subtasks_completed` output is empty, it will be output as `{'Status': 'Completed'}`
+- Example shared variables names: `s_sum`, `s_total`, `s_list_of_words`
+
+## Example Input
+```python
+# Function takes in increment (LLM generated) and s_total (retrieves from shared variable dict), and outputs to s_total (in shared variable dict)
+add = Function(fn_description = "Add <increment: int> to <s_total>", 
+              output_format = {"s_total": "Modified total"})
+
+# Define the calculator agent and the shared_variables - Note the naming convention of s_ at the start of the names for shared variables
+my_agent = Agent('Calculator', 'Does computations', shared_variables = {'s_total': 0}).assign_functions([add])
+
+output = my_agent.run('Increment total by 1')
+
+print('Shared Variables:', my_agent.shared_variables)
+```
+
+## Example Output
+`Subtask identified: Add 1 to the total`
+
+`Calling function add_int_to_variable with parameters {'increment': 1}`
+> {'Status': 'Completed'}
+
+`Task completed successfully!`
+
+`Shared Variables: {'s_total': 1}`
+
+## Example External Function Accessing Shared Variables (Advanced)
+```python
+# Use shared_variables as input to your external function to access and modify the shared variables
+def generate_quotes(shared_variables, number_of_quotes: int, category: str):
+    ''' Adds a quote to the quote list '''
+    # Retrieve from shared variables
+    my_quote_list = shared_variables['s_quote_list']
+    
+    ### Add your function code here ###
+    
+    # Store back to shared variables
+    shared_variables['s_quote_list'] = my_quote_list
+
+generate_quote_fn = Function(fn_description = "Generates <number_of_quotes: int> quotes about <category: str>", 
+              output_format = {}, 
+              external_fn = generate_quotes)
 ```
