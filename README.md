@@ -254,6 +254,9 @@ generate_quote_fn = Function(fn_description = "Generates <number_of_quotes: int>
               external_fn = generate_quotes)
 ```
 
+# Known Limitations
+1. As the agent uses the term "Overall Plan" for its internal planning, try not to use the word "plan" in your query or context, if not it might confuse the agent. Use alternative words like "schedule"
+
 # Contributing to the project
 
 ## Test locally
@@ -269,3 +272,10 @@ generate_quote_fn = Function(fn_description = "Generates <number_of_quotes: int>
 3. Make your changes
 4. Push your changes to your fork
 5. Submit a pull request
+
+# What are we looking out for?
+1. Integrations with functions - It would be good if we could import function definitions from elsewhere, e.g. LangChain, into the format shown here. It might even be done automatically using LLM-based conversion using StrictJSON!
+2. Jupyter Notebooks showcasing what could be done with the framework for something useful. Let your imagination guide you, we look forward to see what you create
+3. Other Known Limitations - Do test the framework out extensively and note its failure cases. We will see if we can address them, if not we will put them in Known Limitations.
+4. (For the prompt engineer). If you could find a better way to make the prompts work, let us know directly - we do need to test this out across all Tutorial Jupyter Notebooks to make sure that it really works with existing datasets. Also, if you are using other LLMs beside OpenAI, and find the prompts do not work as well - try to rejig your own prompts and let us know as well!
+
