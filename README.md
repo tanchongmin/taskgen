@@ -7,10 +7,8 @@
 - Agents with registered functions as skills
 - Hierarchical Agents which can call other Agents as functions
 - Shared Variables between functions to handle non-text modalities as well as very long text
-
-### Upcoming Agent Functionalities (coming soon!)
-- Retrieval Augmented Generation (RAG) - based selection of functions (to be added)
-- RAG-based selection of memory of few-shot examples of how to use functions and how to perform task based on similar tasks done in the past (to be added)
+- Retrieval Augmented Generation (RAG) - based selection of functions
+- RAG-based additional context
 
 ### Benefits of JSON messaging over agentic frameworks using conversational free-text like AutoGen
 - JSON format helps do Chain-of-Thought prompting naturally and is less verbose than free text
