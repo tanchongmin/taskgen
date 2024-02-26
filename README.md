@@ -1,4 +1,4 @@
-# TaskGen v0.0.4
+# TaskGen v0.0.5
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 
@@ -39,19 +39,9 @@ my_agent = Agent('Helpful assistant', 'You are a generalist agent')
 
 ## Example Agent Task Running - Split the assigned task into subtasks and execute each of them
 
-Using standard run
 ```python
-# Using standard run
+# Run your agent
 output = my_agent.run('Give me 5 words rhyming with cool, and make a 4-sentence poem using them')
-```
-
-Using Agent Memory and RAG
-```python
-# Manually adding memories
-my_agent.memory.memory.append("Rhyming words: cool, pool, fool, drool, school")
-
-# Using run with RAG
-output = my_agent.run_with_rag('What are the rhyming words for the word "cool"?')
 ```
 
 `Subtask identified: Find 5 words that rhyme with 'cool'`
@@ -254,6 +244,42 @@ generate_quote_fn = Function(fn_description = "Generates <number_of_quotes: int>
               external_fn = generate_quotes)
 ```
 
+# Memory
+
+## Key Philosophy
+- It would be important to learn from past experience and improve the agentic framework - memory is key to that
+- You can add to the memory bank of your Agents pre-inference (by collecting from a pool of data prior to running the Agent), or during inference (add on in between running subtasks)
+
+## Use Memory in Agents
+- Agent class takes `memory_bank` as a parameter during initialisation of an `Agent`
+- memory_bank: class Dict[Memory]. Stores multiple types of memory for use by the agent. Customise the Memory config within the Memory class.
+    - Default: `memory_bank = {'Function': Memory(top_k = 5, mapper = lambda x: x.fn_description, approach = 'retrieve_by_ranker')}`
+    - Key: `Function` (Already Implemented Natively) - Does RAG over Task -> Function mapping
+    - Can add in more keys that would fit your use case. Retrieves similar items to task/overall plan (if able) for additional context in `get_next_subtasks()` and `use_llm()` function
+    - Side Note: RAG can also be done (and may be preferred) as a separate function of the Agent to retrieve more information when needed (so that we do not overload the Agent with information)
+
+## Memory Class
+- Retrieves top k memory items based on task 
+- Inputs:
+    - `memory`: List. Default: Empty List. The list containing the memory items
+    - `top_k`: Int. Default: 3. The number of memory list items to retrieve
+    - `mapper`: Function. Maps the memory item to another form for comparison by ranker or LLM. Default: `lambda x: x`
+        - Example mapping: `lambda x: x.fn_description` (If x is a Class and the string you want to compare for similarity is the fn_description attribute of that class)
+    - `approach`: str. Either `retrieve_by_ranker` or `retrieve_by_llm` to retrieve memory items.
+        - Ranker is faster and cheaper as it compares via embeddings, but are inferior to LLM-based methods for context information
+    - `ranker`: `Ranker`. The Ranker which defines a similarity score between a query and a key. Default: OpenAI `text-embedding-3-small` model. 
+        - Can be replaced with a function which returns similarity score from 0 to 1 when given a query and key
+        
+## Example Use Case
+- Helps to reduce number of functions present in LLM context for more accurate generation
+```python
+output = my_agent.run('Calculate 2**10 * (5 + 1) / 10')
+```
+
+`Original Function List: add_numbers, subtract_numbers, add_three_numbers, multiply_numbers, divide_numbers, power_of, GCD_of_two_numbers, modulo_of_numbers, absolute_difference, generate_poem_with_numbers, List_related_words, generate_quote`
+
+`Filtered Function Names: add_three_numbers, multiply_numbers, divide_numbers, power_of, modulo_of_numbers`
+
 # Known Limitations
 1. As the agent uses the term "Overall Plan" for its internal planning, try not to use the word "plan" in your query or context, if not it might confuse the agent. Use alternative words like "schedule"
 
@@ -278,4 +304,3 @@ generate_quote_fn = Function(fn_description = "Generates <number_of_quotes: int>
 2. Jupyter Notebooks showcasing what could be done with the framework for something useful. Let your imagination guide you, we look forward to see what you create
 3. Other Known Limitations - Do test the framework out extensively and note its failure cases. We will see if we can address them, if not we will put them in Known Limitations.
 4. (For the prompt engineer). If you could find a better way to make the prompts work, let us know directly - we do need to test this out across all Tutorial Jupyter Notebooks to make sure that it really works with existing datasets. Also, if you are using other LLMs beside OpenAI, and find the prompts do not work as well - try to rejig your own prompts and let us know as well!
-
