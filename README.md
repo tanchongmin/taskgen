@@ -32,7 +32,7 @@ I can't wait to see what this new framework can do for you!
 ### Tutorials and Community Support
 - Created: 17 Feb 2024 by John Tan Chong Min
 - Collaborators welcome
-- Discussion Channel (my discord - John's AI Group): [discord.gg/bzp87AHJy5](discord.gg/bzp87AHJy5)
+- Discussion Channel (my discord - John's AI Group): [https://discord.gg/bzp87AHJy5](https://discord.gg/bzp87AHJy5)
 
 ## How do I use this? 
 1. Download package via command line ```pip install taskgen-ai```
