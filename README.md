@@ -2,13 +2,27 @@
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 
-### TaskGen functionalities
-- Task-based Agents which will break down tasks into subtasks and solve them in bite-sized portions
-- Agents with registered functions as skills
-- Hierarchical Agents which can call other Agents as functions
-- Shared Variables between functions to handle non-text modalities as well as very long text
-- Retrieval Augmented Generation (RAG) - based selection of functions (to be added)
-- RAG-based additional context
+### Creator's Preamble
+Happy to share that the task-based agentic framework I have been working on for three weeks - TaskGen is complete! 
+
+Noteable features include:
+- Splitting of Tasks into subtasks for bite-sized solutions for each subtask
+- Single Agent with LLM Functions
+- Single Agent with External Functions
+- Meta Agent with Inner Agents as Functions
+- Shared Variables for multi-modality support
+- Retrieval Augmented Generation (RAG) over Function space, as well as to provide additional Context to task
+
+I am quite sure that this is the best open-source agentic framework for task-based execution out there! 
+Existing frameworks like AutoGen rely too much on conversational text which is lengthy and not targeted.
+TaskGen uses StrictJSON (JSON parser with type checking and more!) as the core, and agents are efficient and are able to do Chain of Thought natively using JSON keys and descriptions as a guide.
+
+What can you do to help: 
+- Star the github so more people can use it (It's open source and free to use, even commercially!)
+- Contribute your favourite external function integrations so that it can be much more boilerplate for others to use :)
+- Contribute template Jupyter Notebooks for your favourite use cases :)
+
+I can't wait to see what this new framework can do for you!
 
 ### Benefits of JSON messaging over agentic frameworks using conversational free-text like AutoGen
 - JSON format helps do Chain-of-Thought prompting naturally and is less verbose than free text
