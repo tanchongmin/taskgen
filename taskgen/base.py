@@ -109,6 +109,15 @@ def check_datatype(field, key: dict, data_type: str, **kwargs):
     # check for list at beginning of datatype
     # or the output field begins with [ and ends with ] but it is not a list, indicating an error with ast.literal_eval
     if data_type.lower()[:4] == 'list' or (str(field)[0]=='[' and str(field)[-1]==']'):
+        # first try to see if we can do ast.literal_eval with { and }
+        try:
+            field = str(field)
+            startindex = field.find('[')
+            endindex = field.rfind(']')
+            field = field[startindex: endindex+1]
+            field = ast.literal_eval(field)
+        except Exception as e:
+            pass
         if not isinstance(field, list):
             # if it is already in a datatype that is a list, ask LLM to fix it (1 LLM call)
             if '[' in field and ']' in field:
@@ -171,6 +180,7 @@ def check_datatype(field, key: dict, data_type: str, **kwargs):
             if not isinstance(field, dict):
                 # first try to see if we can do ast.literal_eval with { and }
                 try:
+                    field = str(field)
                     startindex = field.find('{')
                     endindex = field.rfind('}')
                     field = field[startindex: endindex+1]

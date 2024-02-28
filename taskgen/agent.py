@@ -165,7 +165,6 @@ class Agent:
         self.default_to_llm = default_to_llm
         
         self.debug = debug
-        self.use_rag = False # Internal state parameter to keep track of whether RAG is used (to see if we need to repeat get_next_subtask() function
         
         # reset agent's state
         self.reset()
@@ -505,7 +504,7 @@ class Agent:
                 res = self.use_function(function_name, function_params, subtask)
                          
             # check if overall task is complete at the last step if num_steps > 1
-            if not self.task_completed:
+            if not self.task_completed and num_subtasks > 1:
                 subtask, function_name, function_params = self.get_next_subtask()
                 if function_name == "end_task":
                     self.task_completed = True
