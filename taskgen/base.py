@@ -384,6 +384,11 @@ def strict_json(system_prompt: str, user_prompt: str, output_format: dict, custo
     '''
     # If OpenAI JSON mode is selected, then just let OpenAI do the processing
     if openai_json_mode:
+        # add in code to throw exception if type is defined for external function
+        for value in output_format.values():
+            if 'type:' in value:
+                raise Exception('Type checking (type:) not done for OpenAI JSON Mode')
+        
         output_format_prompt = "\nOutput in the following json string format: " + str(output_format) + "\nBe concise."
             
         my_system_prompt = str(system_prompt) + output_format_prompt
@@ -493,6 +498,12 @@ class Function:
         self.shared_variable_names = []
         # use regex to extract variables from function description
         matches = re.findall(r'<(.*?)>', self.fn_description)
+
+        # add in code to throw exception if type is defined for external function
+        if external_fn is not None:
+            for value in output_format.values():
+                if 'type:' in value:
+                    raise Exception('Type checking (type:) not done for External Functions')
 
         for match in matches:
             first_half = match.split(':')[0]
