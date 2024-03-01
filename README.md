@@ -1,4 +1,4 @@
-# TaskGen v0.0.7
+# TaskGen v0.0.8
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 
@@ -150,6 +150,28 @@ b2d(10) #x
 #### Example Output
 ```{'output1': 2}```
 
+#### Example fn_description inferred from type hints and docstring of External Function
+```python
+# Docstring must provide all compulsory input variables
+# We will ignore shared_variables, *args and **kwargs
+def add_number_to_list(num1: int, num_list: list, other_var: bool = True, *args, **kwargs):
+    '''Adds num1 to num_list'''
+    num_list.append(num1)
+    return num_list
+
+fn = Function(external_fn = add_number_to_list, 
+    output_format = {'num_array': 'Array of numbers'})
+
+str(fn)
+```
+
+#### Example Output
+`Description: Adds <num1: int> to <num_list: list>`
+
+`Input: ['num1', 'num_list']`
+
+`Output: {'num_list': 'Array of numbers'}`
+
 # Power Up your Agents - Bring in Functions (aka Tools)
 - After creating your agent, use `assign_functions` to assign a list of functions (of class Function) to it
 - Function names will be automatically inferred if not specified
@@ -242,7 +264,7 @@ print('Shared Variables:', my_agent.shared_variables)
 ```python
 # Use shared_variables as input to your external function to access and modify the shared variables
 def generate_quotes(shared_variables, number_of_quotes: int, category: str):
-    ''' Adds a quote to the quote list '''
+    ''' Generates number_of_quotes quotes about category '''
     # Retrieve from shared variables
     my_quote_list = shared_variables['s_quote_list']
     
@@ -251,9 +273,7 @@ def generate_quotes(shared_variables, number_of_quotes: int, category: str):
     # Store back to shared variables
     shared_variables['s_quote_list'] = my_quote_list
 
-generate_quote_fn = Function(fn_description = "Generates <number_of_quotes: int> quotes about <category: str>", 
-              output_format = {}, 
-              external_fn = generate_quotes)
+generate_quote_fn = Function(output_format = {}, external_fn = generate_quotes)
 ```
 
 # Memory

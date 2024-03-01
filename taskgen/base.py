@@ -5,6 +5,7 @@ import re
 import ast
 import copy
 import inspect
+from typing import get_type_hints
 from openai import OpenAI
 
 ### Helper Functions ###
@@ -108,7 +109,7 @@ def check_datatype(field, key: dict, data_type: str, **kwargs):
             
     # check for list at beginning of datatype
     # or the output field begins with [ and ends with ] but it is not a list, indicating an error with ast.literal_eval
-    if data_type.lower()[:4] == 'list' or (str(field)[0]=='[' and str(field)[-1]==']'):
+    if data_type.lower()[:4] == 'list' or data_type.lower()[:5] == 'array' or (str(field)[0]=='[' and str(field)[-1]==']'):
         # first try to see if we can do ast.literal_eval with { and }
         try:
             field = str(field)
@@ -121,11 +122,11 @@ def check_datatype(field, key: dict, data_type: str, **kwargs):
         if not isinstance(field, list):
             # if it is already in a datatype that is a list, ask LLM to fix it (1 LLM call)
             if '[' in field and ']' in field:
-                print(f'Attempting to use LLM to fix {field} as it is not a proper list')
+                print(f'Attempting to use LLM to fix {field} as it is not a proper array')
                 field = convert_to_list(field, **kwargs)   
                 print(f'Fixed list: {field}\n\n')
             else:
-                raise Exception(f'''Output field of "{key}" not of data type list []. If not possible to match, split output field into parts for elements of the list''')
+                raise Exception(f'''Output field of "{key}" not of data type array. If not possible to match, split output field into parts for elements of the array''')
             
     # check for nested list
     # Regex pattern to match content inside square brackets
@@ -134,7 +135,7 @@ def check_datatype(field, key: dict, data_type: str, **kwargs):
         internal_data_type = match.group(1)  # Extract the content inside the brackets
         # do processing for internal elements
         for num in range(len(field)):
-            field[num] = check_datatype(field[num], 'list element of '+key, internal_data_type, **kwargs)
+            field[num] = check_datatype(field[num], 'array element of '+key, internal_data_type, **kwargs)
             
     # if it is not nested, check individually
     else:
@@ -293,7 +294,8 @@ def remove_unicode_escape(my_datatype):
         return my_datatype
     
 def wrap_with_angle_brackets(d: dict, delimiter: str, delimiter_num: int) -> dict:
-    ''' Changes d to output_d by wrapping delimiters over the keys, and putting angle brackets on the values '''
+    ''' Changes d to output_d by wrapping delimiters over the keys, and putting angle brackets on the values 
+    Also changes all mention of `list` after type: to `array` for better processing '''
     if isinstance(d, dict):
         output_d = {}
         # wrap keys with delimiters
@@ -304,6 +306,12 @@ def wrap_with_angle_brackets(d: dict, delimiter: str, delimiter_num: int) -> dic
     elif isinstance(d, list):
         return [wrap_with_angle_brackets(item, delimiter, delimiter_num+1) for item in d]
     elif isinstance(d, str):
+        if 'type:' in d:
+            type_part = d.split('type:')[1]
+            original_type_part = type_part
+            type_part = re.sub(r'\blist\b', 'array', type_part)
+            # replace any mention of the word list with array at the later part
+            d.replace(original_type_part, type_part)
         return f'<{d}>'
     else:
         return d
@@ -358,6 +366,57 @@ def chat(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5-turbo', tem
         print('\nGPT response:', res)
             
     return res
+
+def get_fn_description(my_function) -> (str, list):
+    ''' Returns the modified docstring of my_function, that takes into account input variable names and types in angle brackets
+    Also returns the list of input parameters to the function in sequence
+    e.g.: Adds numbers x and y -> Adds numbers <x: int> and <y: int>
+    Input variables that are optional (already assigned a default value) need not be in the docstring
+    args and kwargs variables are not parsed '''
+     
+    # Get the signature of the function
+    if my_function.__doc__ == None:
+        return '', []
+
+    signature = inspect.signature(my_function)
+    my_fn_description = my_function.__doc__
+
+    param_list = []
+    # Access parameters and their types
+    parameters = signature.parameters
+    if len(parameters) > 0:
+        full_param = get_type_hints(my_function)
+        for param_name, param in parameters.items():
+            # skip the shared_variables, args and kwargs
+            if param_name in ['shared_variables', 'args', 'kwargs']:
+                continue
+            # then parse the types of the param
+            param_type = param.annotation.__name__ if param.annotation != inspect.Parameter.empty else "unannotated"
+            if param_type == "unannotated":
+                new_param = f'<{param_name}>'
+            else:
+                # check if there is typing
+                if param_name in full_param:
+                    hint_str = str(full_param[param_name])
+                    if hint_str[:7] == 'typing.':
+                        param_type = hint_str[7:]
+                new_param = f'<{param_name}: {param_type}>'
+
+            # Define the regular expression pattern to match 'x' as a whole word
+            pattern = re.compile(fr'\b({param_name})\b')
+                
+            # Check if param occurs as a whole word in the docstring
+            if pattern.search(my_fn_description):
+                # Substitute each input variable x with <x> or <x: type>
+                my_fn_description = pattern.sub(new_param, my_fn_description)
+                # add this variable to the param_list
+                param_list.append(param_name)
+            else:
+                # raise exception if the parameter is not already initialised (aka LLM needs to come up with the input)
+                if param.default == inspect.Parameter.empty:
+                    raise Exception(f'Input variable "{param_name}" not in docstring of "{my_function.__name__}"')
+    
+    return my_fn_description, param_list
 
 ### Main Functions ###
                 
@@ -456,8 +515,8 @@ Update text enclosed in <>. Be concise. Output only the json string without any 
 
 class Function:
     def __init__(self,
-                 fn_description: str = 'Output a reminder to define this function in a happy way', 
-                 output_format: dict = {'output': 'sentence'},
+                 fn_description: str = '', 
+                 output_format: dict = {},
                  examples = None,
                  external_fn = None,
                  fn_name = None,
@@ -467,9 +526,10 @@ class Function:
         (Optional) Can define the function based on examples (list of Dict containing input and output variables for each example)
         (Optional) If you would like greater specificity in your function's input, you can describe the variable after the : in the input variable name, e.g. `<var1: an integer from 10 to 30`. Here, `var1` is the input variable and `an integer from 10 to 30` is the description.
         
-        Inputs (compulsory):
+        Inputs (primary):
         - fn_description: String. Function description to describe process of transforming input variables to output variables. Variables must be enclosed in <> and listed in order of appearance in function input.
-        - output_format: String. Dictionary containing output variables names and description for each variable.
+Can also be done automatically by providing docstring with input variable names in external_fn
+        - output_format: Dict. Dictionary containing output variables names and description for each variable.
            
         Inputs (optional):
         - examples: Dict or List[Dict]. Examples in Dictionary form with the input and output variables (list if more than one)
@@ -484,11 +544,26 @@ class Function:
         examples = [{'num1': 5, 'num2': 6, 'output': 11}, {'num1': 2, 'num2': 4, 'output': 6}]
         '''
         
-        # Compulsary variables
-        self.fn_description = fn_description
+        self.fn_description = ''
+        # this is only for external functions
+        self.external_param_list = [] 
+        if external_fn is not None:
+            # add in code to throw exception if type is defined for external function
+            for value in output_format.values():
+                if 'type:' in value:
+                    raise Exception('Type checking (type:) not done for External Functions')
+            # take function description from external_fn if provided and default fn_description not provided
+            if fn_description == '':
+                self.fn_description, self.external_param_list = get_fn_description(external_fn)
+            
+        # if function description provided, use it to update the function description
+        if fn_description != '':
+            self.fn_description = fn_description
+        # if there is no external function docstring provided, raise an error
+        elif self.fn_description == '':
+            raise Exception('Input variable "fn_description" (or docstring for External Functions) not provided')
+
         self.output_format = output_format
-        
-        # Optional variables
         self.examples = examples
         self.external_fn = external_fn
         self.fn_name = fn_name
@@ -498,13 +573,7 @@ class Function:
         self.shared_variable_names = []
         # use regex to extract variables from function description
         matches = re.findall(r'<(.*?)>', self.fn_description)
-
-        # add in code to throw exception if type is defined for external function
-        if external_fn is not None:
-            for value in output_format.values():
-                if 'type:' in value:
-                    raise Exception('Type checking (type:) not done for External Functions')
-
+            
         for match in matches:
             first_half = match.split(':')[0]
             if first_half not in self.variable_names:
@@ -516,6 +585,10 @@ class Function:
                     self.shared_variable_names.append(first_half)
                     # replace the original variable without the <> so as not to confuse the LLM
                     self.fn_description = self.fn_description.replace(f'<{match}>', first_half)
+                    
+        # make it such that we follow the same order for variable names as per the external function only if there are external function params
+        if self.external_param_list != []:
+            self.variable_names = [x for x in self.external_param_list if x in self.variable_names]
                 
         # generate function name if not defined
         if self.fn_name is None:
