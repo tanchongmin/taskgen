@@ -281,8 +281,12 @@ class Agent:
     def remove_function(self, function_name: str):
         ''' Removes a function from the agent '''
         if function_name in self.function_map:
+            function = self.function_map[function_name]
             # remove actual function from memory bank
-            self.memory_bank['Function'].remove(self.function_map[function_name])
+            if function_name not in ['use_llm', 'end_task']:
+                self.memory_bank['Function'].remove(function)
+            # remove function description from fn_description_list
+            self.fn_description_list.remove(function.fn_description)
             # remove function from function map
             del self.function_map[function_name]
         
@@ -325,11 +329,11 @@ class Agent:
                 if self.memory_bank[name].isempty(): continue
                 rag_info += f'Related {name}: ```{self.memory_bank[name].retrieve(subtask)}```\n'
 
-            res = self.query(query = f'{rag_info}Context:```{self.overall_task}-{self.subtasks_completed}```\nTask: ```{function_params["instruction"]}```\nPerform the task - do not just state what has or can be done - actually generate the outcome of the task fully but only within your Agent Capabilities', 
-                            output_format = {"Task Outcome": "Generate a full response to the Task"},
+            res = self.query(query = f'{rag_info}Overall Task:```{self.overall_task}```\nContext:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\nPerform the Assigned Subtask only - do not just state what has or can be done - actually generate the outcome of Assigned Subtask fully but only within your Agent Capabilities', 
+                            output_format = {"Assigned Subtask Outcome": "Generate a full response to the Assigned Subtask"},
                             provide_function_list = False)
             
-            res = res["Task Outcome"]
+            res = res["Assigned Subtask Outcome"]
             
             if self.verbose: 
                 print('>', res)
@@ -355,7 +359,8 @@ class Agent:
         if stateful:
             if res == '':
                 res = {'Status': 'Completed'}
-            self.subtasks_completed[subtask] = res
+            
+            self.add_subtask_result(subtask, res)
 
         return res
    
@@ -372,8 +377,6 @@ class Agent:
         if task == '':
             task = ', '.join(self.overall_plan) if self.overall_plan is not None else task
         task = self.task if task == '' else task
-        
-        
             
         # Add in memory to the Agent
         rag_info = ''
@@ -384,40 +387,50 @@ class Agent:
             if self.memory_bank[name].isempty(): continue
             else:
                 rag_info += f'Related {name}: ```{self.memory_bank[name].retrieve(task)}```\n'
-
-        res = self.query(query = f'''{background_info}{rag_info}First create an Overall Plan modified from Assigned Plan with an array of steps to do Assigned Task from beginning to end, including uncompleted steps. Then, reflect on Past Subtasks Completed to see what steps in Overall Plan are already completed. Then, generate Overall Plan Completed that outputs True for array elements of Overall Plan that are complete and False otherwsie. Then, generate the Next Step to fulfil the Assigned Task. Check that the Next Step can be processed by exactly one Equipped Function from the Equipped Function array only. If Overall Plan has been completed, call end_task''',
-                         output_format = {"Thoughts": "How to do Assigned Task", "Overall Plan": "Array of steps to complete Assigned Task from beginning to end, type: list", "Reflection": "What has been done and what is still left to do", "Overall Plan Completed": "Whether array elements in Overall Plan are already completed, type: List[bool]", "Next Step": "First non-completed element in Overall Plan", "Equipped Function": f"Name of Equipped Function to use for Next Step", "Equipped Function Input": "Input for the Equipped Function in the form of {'input_parameter': 'input_value'} for each 'input_parameter' in Input, type: dict"},
+                
+        # First select the Equipped Function
+        res = self.query(query = f'''{background_info}{rag_info}First create an Overall Plan modified from Assigned Plan with an array of steps to do Assigned Task from beginning to end, including uncompleted steps. Then, reflect on Past Subtasks Completed (note not all past subtasks are relevant to Assigned Task) to see what steps in Overall Plan are already completed. Then, generate Overall Plan Completed that outputs True for array elements of Overall Plan that are complete and False otherwsie. Then, generate the Next Step to fulfil the Assigned Task that can be performed by a single Equipped Function. If Assigned Task is completed, output end_task for Equipped Function''',
+                         output_format = {"Thoughts": "How to do Assigned Task", "Overall Plan": "Array of steps to complete Assigned Task from beginning to end, type: list", "Reflection": "What has been done and what is still left to do", "Overall Plan Completed": "Whether array elements in Overall Plan are already completed, type: List[bool]", "Next Step": "First non-completed element in Overall Plan", "Equipped Function": f"Name of Equipped Function to use for Next Step, type: Enum{list(self.function_map.keys())}", "Instruction": "Instruction for the Equipped Function if any"},
                           provide_function_list = True,
                          task = task)
 
-        # default just use llm
-        if res['Equipped Function'] not in self.function_map:
-            res['Equipped Function'] = 'use_llm'
-
-        # if no plan, do not end yet
-        if res['Overall Plan'] == [] and res['Equipped Function'] == 'end_task':
-            res['Equipped Function'] = 'use_llm'
-
-        # if use_llm or end_task is in the Equipped Function, just make it use_llm or end_task
-        if 'use_llm' in res['Equipped Function']: 
-            res['Equipped Function'] = 'use_llm'
-        if 'end_task' in res['Equipped Function']: 
-            res['Equipped Function'] = 'end_task'
-
-        # format the parameters if it is blank or use_llm 
-        if res["Equipped Function Input"] == {} or res['Equipped Function'] == 'use_llm':
-            res["Equipped Function Input"] = {"instruction": res["Next Step"]}
+        # If equipped function is use_llm, or end_task, we don't need to do another query
+        cur_function = self.function_map[res["Equipped Function"]]
+        if res["Equipped Function"] == 'use_llm':
+            res['Equipped Function Input'] = {'instruction': res['Next Step']}
+        elif res['Equipped Function'] == 'end_task':
+            res['Equipped Function Input'] = {}
+        # Otherwise, if it is only the instruction, no type check needed, so just take the instruction
+        elif len(cur_function.variable_names) == 1 and cur_function.variable_names[0].lower() == "instruction":
+            res['Equipped Function Input'] = {'instruction': res['Instruction']}
+            
+        # Otherwise, do another query to get type-checked input parameters and ensure all input fields are present
+        else:
+            input_format = {}
+            fn_description = cur_function.fn_description
+            matches = re.findall(r'<(.*?)>', fn_description)
+            
+            # do up an output format dictionary to use to get LLM to output exactly based on keys and types needed
+            for match in matches:
+                if ':' in match:
+                    first_part, second_part = match.split(':', 1)
+                    input_format[first_part] = f'A suitable value, type: {second_part}'
+                else:
+                    input_format[match] = 'A suitable value'
+                    
+                    
+            res2 = self.query(query = f'''{background_info}{rag_info}Current Subtask: {res["Next Step"]}\nEquipped Function Name: {res["Equipped Function"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for the input parameters of the Equipped Function to fulfil Current Subtask''',
+                         output_format = input_format,
+                         provide_function_list = False)
+            
+            res["Equipped Function Input"] = res2
 
         ## End Task Overrides
-
-        # if there is no use_llm function, then end task
-        if res['Equipped Function'] == 'use_llm' and self.default_to_llm is False:
-            res['Equipped Function'] = 'end_task'
-
         # if the next step is already done before, then end the task. Unless it is in OS mode, then allow it
         if res["Next Step"] in self.subtasks_completed and self.default_to_llm is True:
             res["Equipped Function"] = "end_task"
 
+        # if whole plan is completed, end task
         if False not in res['Overall Plan Completed']:
             res['Equipped Function'] = 'end_task'
 
@@ -426,7 +439,20 @@ class Agent:
             self.overall_plan = res['Overall Plan']
             
         return res["Next Step"], res["Equipped Function"], res["Equipped Function Input"]
-    
+        
+    def add_subtask_result(self, subtask, result):
+        ''' Adds the subtask and result to subtasks_completed
+        Keep adding (num) to subtask str if there is duplicate '''
+        subtask_str = str(subtask)
+        count = 2
+        
+        # keep adding count until we have a unique id
+        while subtask_str in self.subtasks_completed:
+            subtask_str = str(subtask) + f'({count})'
+            count += 1
+            
+        self.subtasks_completed[subtask_str] = result
+        
     def remove_last_subtask(self):
         ''' Removes last subtask in subtask completed. Useful if you want to retrace a step '''
         if len(self.subtasks_completed) > 0:
@@ -447,17 +473,17 @@ class Agent:
         
         my_query = self.task if query == '' else query
             
-        res = self.query(query = f'Context: ```{self.subtasks_completed}```\nTask: ```{my_query}```\n', 
-                                    output_format = {"Task Outcome": "Use the Context as ground truth to respond to the task. Do not respond with any information not from Context."},
+        res = self.query(query = f'Context: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nGenerate a response to the Assigned Task using the Context only', 
+                                    output_format = {"Response to Assigned Task": "Use the Context as ground truth to respond to as many parts of the Assigned Task as possible. Do not respond with any information not from Context."},
                                     provide_function_list = False)
         
-        res = res["Task Outcome"]
+        res = res["Response to Assigned Task"]
         
         if self.verbose:
             print(res)
         
         if stateful:
-            self.subtasks_completed[my_query] = res
+            self.add_subtask_result(my_query, res)
         
         return res
 

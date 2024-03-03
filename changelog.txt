@@ -1,3 +1,13 @@
+3 Mar 2024 (v1.0.0)
+- Better prompt engineering for `use_llm`, `reply_user`, `get_next_subtask`
+- Subtasks completed index now a string so as to store unhashable datatypes too
+- Added functionality for removing `use_llm` and `end_task` as functions of Agent (in case you want to do manual execution of functions)
+- Now allowing for duplicate subtask names by adding (count) at the end of the subtask instruction -> needed for OS-like usage\
+- Equipped Function in `get_next_subtask()` now uses an Enum to force the answer into a legitimate assigned function
+- `get_next_subtask()` now generates the Equipped Function Inputs separately for non-instruction-based inputs, allowing for all input fields and input types to be enforced by strictjson
+- Better distinguished between Subtask and Overall Task in `use_llm`, so that `use_llm` should only focus on the current Subtask and not solve Overall Task directly
+- Fixed issue with nested outputs of nested dictionaries / lists after I added the true/false to True/False auto conversion
+
 1 Mar 2024 (v0.0.8)
 - Added automatic parsing of fn_description from external function's docstring if fn_description is not provided for `Function()`
 - type checks now support `array`: same functionality as `list`, but LLM may understand `array` better due to JSON formatting type

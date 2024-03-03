@@ -1,9 +1,9 @@
-# TaskGen v0.0.8
+# TaskGen v1.0.0
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 
 ### Creator's Preamble
-Happy to share that the task-based agentic framework I have been working on for three weeks - TaskGen - is complete! 
+Happy to share that the task-based agentic framework I have been working on - TaskGen - is largely complete! 
 
 Noteable features include:
 - Splitting of Tasks into subtasks for bite-sized solutions for each subtask
@@ -106,9 +106,10 @@ my_agent.status()
 - Provides a function-like interface for repeated use of modular LLM-based functions (or wraps external functions for use with TaskGen)
 - Use angle brackets <> to enclose input variable names. First input variable name to appear in `fn_description` will be first input variable and second to appear will be second input variable. For example, `fn_description = 'Adds up two numbers, <var1> and <var2>'` will result in a function with first input variable `var1` and second input variable `var2`
 - (Optional) If you would like greater specificity in your function's input, you can describe the variable after the : in the input variable name, e.g. `<var1: an integer from 10 to 30`. Here, `var1` is the input variable and `an integer from 10 to 30` is the description.
+- (Optional) If your description of the variable is one of `int`, `float`, `str`, `dict`, `list`, `array`, `Dict[]`, `List[]`, `Array[]`, `Enum[]`, `bool`, we will enforce type checking when generating the function inputs in `get_next_subtask` method of the `Agent` class. Refer to Tutorial 0 - StrictJSON for the details.
 - Inputs (compulsory):
     - **fn_description**: String. Function description to describe process of transforming input variables to output variables. Variables must be enclosed in <> and listed in order of appearance in function input.
-    - **output_format**: Dict. Dictionary containing output variables names and description for each variable. Refer to StrictJSON-Overview.ipynb for details on type checking for `output_format`
+    - **output_format**: String. Dictionary containing output variables names and description for each variable. Refer to StrictJSON-Overview.ipynb for details on type checking for `output_format`
     
 - Inputs (optional):
     - **examples** - Dict or List[Dict]. Examples in Dictionary form with the input and output variables (list if more than one)

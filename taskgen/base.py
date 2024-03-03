@@ -39,7 +39,7 @@ def convert_to_dict(field: str, keys: dict, delimiter: str) -> dict:
     # Use regular expressions to extract keys and values
     pattern = fr",*\s*['|\"]{delimiter}([^#]*){delimiter}['|\"]: "
 
-    matches = re.split(pattern, field[1:-1])
+    matches = re.split(pattern, str(field[1:-1]).strip())
 
     # remove null matches
     my_matches = [match for match in matches if match !='']
@@ -232,14 +232,14 @@ def check_key(field: str, output_format, new_output_format, delimiter: str, deli
             
         # after creating dictionary, step into next layer
         for key, value in output_d.items():
-            # if the output is a bool type, convert true and false into True and False for ast.literal_eval parsing
-            if 'bool' in output_format[key].split('type:')[-1]:
+            # # if the output is a bool type, convert true and false into True and False for ast.literal_eval parsing
+            if isinstance(output_format[key], str) and 'type:' in output_format[key] and 'bool' in output_format[key].split('type:')[-1]:
                 value = value.replace('true','True').replace('false','False')
             output_d[key] = check_key(value, output_format[key], new_output_format[cur_delimiter+key+cur_delimiter], delimiter, delimiter_num+1)
             # after stepping back from the later layers back to present layer, check for types
-            if 'type:' in output_format[key]:             
+            if isinstance(output_format[key], str) and 'type:' in output_format[key]:             
                 # extract out data type
-                data_type = output_format[key].split('type:')[-1]
+                data_type = str(output_format[key]).split('type:')[-1]
                 # check the data type, perform type conversion as necessary
                 output_d[key] = check_datatype(output_d[key], key, data_type, **kwargs)   
                 
@@ -443,10 +443,13 @@ def strict_json(system_prompt: str, user_prompt: str, output_format: dict, custo
     '''
     # If OpenAI JSON mode is selected, then just let OpenAI do the processing
     if openai_json_mode:
-        # add in code to throw exception if type is defined for external function
+        # add in code to warn user if type is defined for external function
+        type_check = False
         for value in output_format.values():
-            if 'type:' in value:
-                raise Exception('Type checking (type:) not done for OpenAI JSON Mode')
+            if 'type:' in str(value):
+                type_check = True
+        if type_check:
+            print('Note: Type checking (type:) not done for OpenAI JSON Mode')
         
         output_format_prompt = "\nOutput in the following json string format: " + str(output_format) + "\nBe concise."
             
@@ -548,10 +551,13 @@ Can also be done automatically by providing docstring with input variable names 
         # this is only for external functions
         self.external_param_list = [] 
         if external_fn is not None:
-            # add in code to throw exception if type is defined for external function
+            # add in code to warn user if type is defined for external function
+            type_check = False
             for value in output_format.values():
-                if 'type:' in value:
-                    raise Exception('Type checking (type:) not done for External Functions')
+                if 'type:' in str(value):
+                    type_check = True
+            if type_check:
+                print('Note: Type checking (type:) not done for External Functions')
             # take function description from external_fn if provided and default fn_description not provided
             if fn_description == '':
                 self.fn_description, self.external_param_list = get_fn_description(external_fn)
