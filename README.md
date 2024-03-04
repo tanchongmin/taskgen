@@ -102,24 +102,25 @@ my_agent.status()
 
 `Is Task Completed: True`
 
-# Functions
-- Provides a function-like interface for repeated use of modular LLM-based functions (or wraps external functions for use with TaskGen)
+# 4. Functions
+- Enhances ```strict_json()``` with a function-like interface for repeated use of modular LLM-based functions (or wraps external functions)
 - Use angle brackets <> to enclose input variable names. First input variable name to appear in `fn_description` will be first input variable and second to appear will be second input variable. For example, `fn_description = 'Adds up two numbers, <var1> and <var2>'` will result in a function with first input variable `var1` and second input variable `var2`
 - (Optional) If you would like greater specificity in your function's input, you can describe the variable after the : in the input variable name, e.g. `<var1: an integer from 10 to 30>`. Here, `var1` is the input variable and `an integer from 10 to 30` is the description.
-- (Optional) If your description of the variable is one of `int`, `float`, `str`, `dict`, `list`, `array`, `Dict[]`, `List[]`, `Array[]`, `Enum[]`, `bool`, we will enforce type checking when generating the function inputs in `get_next_subtask` method of the `Agent` class. Example: `<var1: int>`. Refer to Tutorial 0 - StrictJSON for the details.
-- Inputs (compulsory):
+- (Optional) If your description of the variable is one of `int`, `float`, `str`, `dict`, `list`, `array`, `Dict[]`, `List[]`, `Array[]`, `Enum[]`, `bool`, we will enforce type checking when generating the function inputs in `get_next_subtask` method of the `Agent` class. Example: `<var1: int>` Refer to Tutorial 0, Section 3. Type Forcing Output Variables for details.
+- Inputs (primary):
     - **fn_description**: String. Function description to describe process of transforming input variables to output variables. Variables must be enclosed in <> and listed in order of appearance in function input.
-    - **output_format**: Dict. Dictionary containing output variables names and description for each variable. Refer to StrictJSON-Overview.ipynb for details on type checking for `output_format`
+        - New feature: If `external_fn` is provided and no `fn_description` is provided, then we will automatically parse out the fn_description based on docstring of `external_fn`. Only requirement is that the docstring must contain the names of all compulsory input variables
+    - **output_format**: Dict. Dictionary containing output variables names and description for each variable.
     
 - Inputs (optional):
     - **examples** - Dict or List[Dict]. Examples in Dictionary form with the input and output variables (list if more than one)
     - **external_fn** - Python Function. If defined, instead of using LLM to process the function, we will run the external function. 
         If there are multiple outputs of this function, we will map it to the keys of `output_format` in a one-to-one fashion
     - **fn_name** - String. If provided, this will be the name of the function. Ohterwise, if `external_fn` is provided, it will be the name of `external_fn`. Otherwise, we will use LLM to generate a function name from the `fn_description`
-    - **kwargs** - Dict. Additional arguments you would like to pass on to the `strict_json` function
+    - **kwargs** - Dict. Additional arguments you would like to pass on to the strict_json function
         
 - Outputs:
-    JSON of output variables in a dictionary
+    JSON of output variables in a dictionary (similar to ```strict_json```)
     
 #### Example Internal LLM-Based Function
 ```python
