@@ -1,2 +1,8 @@
 taskgen_ai.egg-info
 __pycache__/
+.venv/
+
+# ignore all .env except example.env
+!.env
+.env*
+
