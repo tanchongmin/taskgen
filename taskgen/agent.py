@@ -42,6 +42,8 @@ class Ranker:
             if query in self.database:
                 query_embedding = self.database[query]
             else:
+                if isinstance(query, Function):
+                    query = query.fn_description
                 query = query.replace("\n", " ")
                 query_embedding = client.embeddings.create(input = [query], model=self.model).data[0].embedding
                 self.database[query] = query_embedding
