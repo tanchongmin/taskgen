@@ -2,15 +2,19 @@ import os
 from datetime import datetime
 
 import pyautogui
-from scripts.env_loader import load_api_key
+
 from utils.create_screenshot_folder import create_screenshots_folder
+from utils.env_loader import load_api_key
 
 from taskgen import Agent, Function
 
-# from scripts.actions import greet_user, store_name
-
 api_key = load_api_key()
 
+# LLM-based function
+llm_function = Function(
+    fn_description="Generate a greeting message for <name>",
+    output_format={"output": "greeting message"},
+)
 
 def take_screenshot(shared_variables, x: int):
     screenshots_folder = create_screenshots_folder()
