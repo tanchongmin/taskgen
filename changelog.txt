@@ -1,9 +1,9 @@
 18 Mar 2024 (v1.1.0)
 - Made the llm variable more robust by explicitly referencing it in the calls from `Agent` to `Function` to `strict_json`
+- Added agent loading and saving using `save_agent` and `load_agent`
+- Added `get_additional_context` for persistent variables and additional prompts to be given to `Agent`
 - Ensure that in `Ranker`, the query and key are always string to prevent unhashable types from being referenced by dictionary
 - If function takes in no input, in `next_subtasks_completed()` we will not force the LLM to output the parameter and skip the step for input parameter type conformity
-- Added agent loading and saving using `save_agent` and `load_agent`
-- Added `get_additional_context` for persistent variables and additional prompts to be given to Agent
 
 3 Mar 2024 (v1.0.0)
 - Better prompt engineering for `use_llm`, `reply_user`, `get_next_subtask`
