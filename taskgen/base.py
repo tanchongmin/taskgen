@@ -523,6 +523,7 @@ class Function:
                  examples = None,
                  external_fn = None,
                  fn_name = None,
+                 llm = None,
                  **kwargs):
         ''' 
         Creates an LLM-based function or wraps an external function using fn_description and outputs JSON based on output_format. 
@@ -539,6 +540,7 @@ Can also be done automatically by providing docstring with input variable names 
         - external_fn: Python Function. If defined, instead of using LLM to process the function, we will run the external function. 
             If there are multiple outputs of this function, we will map it to the keys of `output_format` in a one-to-one fashion
         - fn_name: String. If provided, this will be the name of the function. Otherwise, if `external_fn` is provided, it will be the name of `external_fn`. Otherwise, we will use LLM to generate a function name from the `fn_description`
+        - llm: Function. The llm parameter to pass into strict_json
         - **kwargs: Dict. Additional arguments you would like to pass on to the strict_json function
         
         ## Example
@@ -573,6 +575,7 @@ Can also be done automatically by providing docstring with input variable names 
         self.examples = examples
         self.external_fn = external_fn
         self.fn_name = fn_name
+        self.llm = llm
         self.kwargs = kwargs
         
         self.variable_names = []
@@ -605,7 +608,9 @@ Can also be done automatically by providing docstring with input variable names 
             else:
                 res = strict_json(system_prompt = "Output a function name to summarise the usage of this function.",
                                   user_prompt = str(self.fn_description),
-                                  output_format = {"Thoughts": "What function does", "Name": "Function name with _ separating words that summarises what function does"})
+                                  output_format = {"Thoughts": "What function does", "Name": "Function name with _ separating words that summarises what function does"},
+                                 llm = self.llm,
+                                 **self.kwargs)
                 self.fn_name = res['Name']
                 
         # change instance's name to function's name
@@ -658,6 +663,7 @@ Can also be done automatically by providing docstring with input variable names 
             res = strict_json(system_prompt = self.fn_description,
                             user_prompt = function_kwargs,
                             output_format = self.output_format,
+                            llm = self.llm,
                             **self.kwargs, **strict_json_kwargs)
             
         # Else run the external function
