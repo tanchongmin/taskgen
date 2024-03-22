@@ -12,7 +12,9 @@ Noteable features include:
 - Single Agent with External Functions
 - Meta Agent with Inner Agents as Functions
 - Shared Variables for multi-modality support
-- Retrieval Augmented Generation (RAG) over Function space, as well as to provide additional Context to task
+- Retrieval Augmented Generation (RAG) over Function space
+- Memory to provide additional task-based prompts for task
+- Additional Context for configuring your own prompts + add persistent variables
 
 I am quite sure that this is the best open-source agentic framework for task-based execution out there! 
 Existing frameworks like AutoGen rely too much on conversational text which is lengthy and not targeted.
