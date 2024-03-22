@@ -1,3 +1,8 @@
+22 Mar 2024 (v1.2.0)
+- Changed StrictJSON prompt to make it better: Added "You must output valid json with all keys present." to system prompt of `strict_json` to make it more robust
+- Added `is_compulsory` variable in `Function`. Default: `False`. When set to `True`, make them always appear for planning regardless of whether RAG is used
+- Added more examples for memory
+
 18 Mar 2024 (v1.1.0)
 - Made the llm variable more robust by explicitly referencing it in the calls from `Agent` to `Function` to `strict_json`
 - Added agent loading and saving using `save_agent` and `load_agent`

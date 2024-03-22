@@ -473,7 +473,7 @@ def strict_json(system_prompt: str, user_prompt: str, output_format: dict, custo
         new_output_format = wrap_with_angle_brackets(output_format, delimiter, 1)
         
         output_format_prompt = f'''\nOutput in the following json string format: {new_output_format}
-Update text enclosed in <>. Be concise. Output only the json string without any explanation.'''
+Update text enclosed in <>. Be concise. Output only the json string without any explanation. You must output valid json with all keys present.'''
 
         for i in range(num_tries):
             my_system_prompt = str(system_prompt) + output_format_prompt + error_msg
@@ -522,6 +522,7 @@ class Function:
                  output_format: dict = {},
                  examples = None,
                  external_fn = None,
+                 is_compulsory = False,
                  fn_name = None,
                  llm = None,
                  **kwargs):
@@ -539,6 +540,7 @@ Can also be done automatically by providing docstring with input variable names 
         - examples: Dict or List[Dict]. Examples in Dictionary form with the input and output variables (list if more than one)
         - external_fn: Python Function. If defined, instead of using LLM to process the function, we will run the external function. 
             If there are multiple outputs of this function, we will map it to the keys of `output_format` in a one-to-one fashion
+        - is_compulsory: Bool. Default: False. This is whether to always use the Function when doing planning in Agents
         - fn_name: String. If provided, this will be the name of the function. Otherwise, if `external_fn` is provided, it will be the name of `external_fn`. Otherwise, we will use LLM to generate a function name from the `fn_description`
         - llm: Function. The llm parameter to pass into strict_json
         - **kwargs: Dict. Additional arguments you would like to pass on to the strict_json function
@@ -574,6 +576,7 @@ Can also be done automatically by providing docstring with input variable names 
         self.output_format = output_format
         self.examples = examples
         self.external_fn = external_fn
+        self.is_compulsory = is_compulsory
         self.fn_name = fn_name
         self.llm = llm
         self.kwargs = kwargs

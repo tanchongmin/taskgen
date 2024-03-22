@@ -192,10 +192,12 @@ class Agent:
         if self.default_to_llm:
             self.assign_functions([Function(fn_name = 'use_llm', 
                                         fn_description = f'Used only when no other function can do the task', 
+                                        is_compulsory = True,
                                         output_format = {"Output": "Output of LLM"})])
         # adds the end task function
         self.assign_functions([Function(fn_name = 'end_task',
                                        fn_description = 'Use only when task is completed',
+                                       is_compulsory = True,
                                        output_format = {})])
         
     def save_agent(self, filename: str):
@@ -253,11 +255,10 @@ class Agent:
         filtered_fn_list = None
         if task != '':
             filtered_fn_list = self.memory_bank['Function'].retrieve(task)
-            # add back use_llm and end_task if present in function_map
-            if 'use_llm' in self.function_map:
-                filtered_fn_list.append(self.function_map['use_llm'])
-            if 'end_task' in self.function_map:
-                filtered_fn_list.append(self.function_map['end_task'])
+            # add back compulsory functions (default: use_llm, end_task) if present in function_map
+            for name, function in self.function_map.items():
+                if function.is_compulsory:
+                    filtered_fn_list.append(function)
                 
         # add in additional context to the prompt
         additional_context = ''
@@ -322,8 +323,8 @@ class Agent:
             # add function's description into fn_description_list
             self.fn_description_list.append(function.fn_description)
                                     
-            # add function to memory bank if is not the default functions
-            if stored_fn_name not in ['use_llm', 'end_task']:
+            # add function to memory bank for RAG over functions later on if is not a compulsory functions
+            if not function.is_compulsory:
                 self.memory_bank['Function'].append(function)
             
         return self
@@ -344,7 +345,7 @@ class Agent:
         ''' Returns the list of functions available to the agent. If fn_list is given, restrict the functions to only those in the list '''
         if fn_list is not None and len(fn_list) < len(self.function_map):
             if self.verbose:
-                print('Filtered Function Names:', ', '.join([name for name, function in self.function_map.items() if function.fn_name not in ['use_llm', 'end_task'] and function in fn_list]))
+                print('Filtered Function Names:', ', '.join([name for name, function in self.function_map.items() if function in fn_list]))
             return [f'Name: {name}\n' + str(function) for name, function in self.function_map.items() if function in fn_list]
         else:
             return [f'Name: {name}\n' + str(function) for name, function in self.function_map.items()]                       

@@ -1,4 +1,4 @@
-# TaskGen v1.1.0
+# TaskGen v1.2.0
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 - Video: https://www.youtube.com/watch?v=O_XyTT7QGH4
