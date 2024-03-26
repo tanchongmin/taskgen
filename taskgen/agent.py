@@ -134,7 +134,7 @@ class Agent:
                  max_subtasks: int = 5,
                  memory_bank = {'Function': Memory(top_k = 5, mapper = lambda x: x.fn_name + ': ' + x.fn_description, approach = 'retrieve_by_ranker')},
                  shared_variables = dict(),
-                 get_additional_context = None,
+                 get_global_context = None,
                  default_to_llm = True,
                  verbose: bool = True,
                  debug: bool = False,
@@ -157,7 +157,7 @@ class Agent:
             - For RAG over Documents, it is best done in a function of the Agent to retrieve more information when needed (so that we do not overload the Agent with information)
         - shared_variables. Dict. Default: empty dict. Stores the variables to be shared amongst inner functions and agents. 
             If not empty, will pass this dictionary by reference down to the inner agents and functions
-        - get_additional_context. Function. Takes in self (agent variable) and returns the additional prompt (str) to be appended to `get_next_subtask` and `use_llm`. Allows for persistent agent states to be added to the prompt
+        - get_global_context. Function. Takes in self (agent variable) and returns the additional prompt (str) to be appended to `get_next_subtask` and `use_llm`. Allows for persistent agent states to be added to the prompt
         - default_to_llm. Bool. Default: True. Whether to default to use_llm function if there is no match to other functions. If False, use_llm will not be given to Agent
         - verbose: Bool. Default: True. Whether to print out intermediate thought processes of the Agent
         - debug: Bool. Default: False. Whether to debug StrictJSON messages
@@ -174,7 +174,7 @@ class Agent:
         self.memory_bank = memory_bank
         self.shared_variables = shared_variables
         self.default_to_llm = default_to_llm
-        self.get_additional_context = get_additional_context
+        self.get_global_context = get_global_context
 
         self.debug = debug
         self.llm = llm
@@ -261,14 +261,14 @@ class Agent:
                     filtered_fn_list.append(function)
                 
         # add in additional context to the prompt
-        additional_context = ''
-        if self.get_additional_context is not None:
-            additional_context = 'Additional Context:' + self.get_additional_context(self) + '\n'
+        global_context = ''
+        if self.get_global_context is not None:
+            global_context = 'Additional Context:' + self.get_global_context(self) + '\n'
         
         system_prompt = f"You are an agent named {self.agent_name} with the following description: ```{self.agent_description}```\n"
         if provide_function_list:
             system_prompt += f"You have the following Equipped Functions available:\n```{self.list_functions(filtered_fn_list)}```\n"
-        system_prompt += additional_context
+        system_prompt += global_context
         system_prompt += query
         
         
@@ -546,7 +546,7 @@ class Agent:
 
     def run(self, task: str = '', overall_task: str = '', num_subtasks: int = 0) -> list:
         ''' Attempts to do the task using LLM and available functions
-        Loops through and performs either a function call or LLM call up to max_steps number of times
+        Loops through and performs either a function call or LLM call up to num_subtasks number of times
         If overall_task is filled, then we store it to pass to the inner agents for more context '''
             
         # Assign the task

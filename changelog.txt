@@ -1,3 +1,7 @@
+26 Mar 2024 (v1.3.0)
+- Changed `get_additional_context` to `get_global_context` to better reflect that it is information that carries over across tasks
+- Refined Tutorial 5 Chatbot with Sherlock Holmes example to make it more performant with some prompt changes
+
 22 Mar 2024 (v1.2.0)
 - Changed StrictJSON prompt to make it better: Added "You must output valid json with all keys present." to system prompt of `strict_json` to make it more robust
 - Added `is_compulsory` variable in `Function`. Default: `False`. When set to `True`, make them always appear for planning regardless of whether RAG is used

@@ -1,4 +1,4 @@
-# TaskGen v1.2.0
+# TaskGen v1.3.0
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 - Video: https://www.youtube.com/watch?v=O_XyTT7QGH4
@@ -14,7 +14,7 @@ Noteable features include:
 - Shared Variables for multi-modality support
 - Retrieval Augmented Generation (RAG) over Function space
 - Memory to provide additional task-based prompts for task
-- Additional Context for configuring your own prompts + add persistent variables
+- Global Context for configuring your own prompts + add persistent variables
 
 I am quite sure that this is the best open-source agentic framework for task-based execution out there! 
 Existing frameworks like AutoGen rely too much on conversational text which is lengthy and not targeted.
@@ -343,20 +343,20 @@ output = my_agent.run('Calculate 2**10 * (5 + 1) / 10')
 
 `Filtered Function Names: add_three_numbers, multiply_numbers, divide_numbers, power_of, modulo_of_numbers`
 
-# Additional Context - See Tutorial 5 (Advanced)
-- Agent takes in one additional parameter: `get_additional_context`
+# Global Context - See Tutorial 5 (Advanced)
+- Agent takes in one additional parameter: `get_global_context`
 - This is a function that takes in the agent's internal parameters (self) and outputs a string to the LLM to append to the prompts of any LLM-based calls internally, e.g. `get_next_subtask`, `use_llm`, `reply_to_user`
-- You have full flexibility to access anything the agent knows and configure an additional prompt to the agent
+- You have full flexibility to access anything the agent knows and configure a global prompt to the agent
 
 ## Uses
 - Used mainly to provide persistent variables to an agent that is not conveniently stored in `subtasks_completed`, e.g. ingredients remaining, location in grid for robot
 <br></br>
 - Implementing your own specific instructions to the default planner prompt
-    - Implement your own memory-based RAG / additional prompt instruction if you need more than what the default prompt can achieve
+    - Implement your own memory-based RAG / global prompt instruction if you need more than what the default prompt can achieve
 <br></br>
 - Avoid Multiple Similar Subtasks in `subtasks_history`
     - If you have multiple similar subtask names, then it is likely the Agent can be confused and think it has already done the subtask
-    - In this case, you can disambiguate by resetting the agent and store the persistent information in `shared_variables` and provide it to the agent using `get_additional_context`
+    - In this case, you can disambiguate by resetting the agent and store the persistent information in `shared_variables` and provide it to the agent using `get_global_context`
 
 # Known Limitations
 1. As the agent uses the term "Overall Plan" for its internal planning, try not to use the word "plan" in your query or context, if not it might confuse the agent. Use alternative words like "schedule"
