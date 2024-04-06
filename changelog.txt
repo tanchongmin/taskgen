@@ -1,3 +1,19 @@
+26 Mar 2024 (v1.3.0)
+- Changed `get_additional_context` to `get_global_context` to better reflect that it is information that carries over across tasks
+- Refined Tutorial 5 Chatbot with Sherlock Holmes example to make it more performant with some prompt changes
+
+22 Mar 2024 (v1.2.0)
+- Changed StrictJSON prompt to make it better: Added "You must output valid json with all keys present." to system prompt of `strict_json` to make it more robust
+- Added `is_compulsory` variable in `Function`. Default: `False`. When set to `True`, make them always appear for planning regardless of whether RAG is used
+- Added more examples for memory
+
+18 Mar 2024 (v1.1.0)
+- Made the llm variable more robust by explicitly referencing it in the calls from `Agent` to `Function` to `strict_json`
+- Added agent loading and saving using `save_agent` and `load_agent`
+- Added `get_additional_context` for persistent variables and additional prompts to be given to `Agent`
+- Ensure that in `Ranker`, the query and key are always string to prevent unhashable types from being referenced by dictionary
+- If function takes in no input, in `next_subtasks_completed()` we will not force the LLM to output the parameter and skip the step for input parameter type conformity
+
 3 Mar 2024 (v1.0.0)
 - Better prompt engineering for `use_llm`, `reply_user`, `get_next_subtask`
 - Subtasks completed index now a string so as to store unhashable datatypes too

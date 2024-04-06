@@ -1,7 +1,8 @@
-# TaskGen v1.0.0
+# TaskGen v1.3.0
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
-- Video: https://www.youtube.com/watch?v=O_XyTT7QGH4
+- Video (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
+- Video (Part 2): https://www.youtube.com/watch?v=OWk7moRfTPE
 
 ### Creator's Preamble
 Happy to share that the task-based agentic framework I have been working on - TaskGen - is largely complete! 
@@ -12,7 +13,9 @@ Noteable features include:
 - Single Agent with External Functions
 - Meta Agent with Inner Agents as Functions
 - Shared Variables for multi-modality support
-- Retrieval Augmented Generation (RAG) over Function space, as well as to provide additional Context to task
+- Retrieval Augmented Generation (RAG) over Function space
+- Memory to provide additional task-based prompts for task
+- Global Context for configuring your own prompts + add persistent variables
 
 I am quite sure that this is the best open-source agentic framework for task-based execution out there! 
 Existing frameworks like AutoGen rely too much on conversational text which is lengthy and not targeted.
@@ -40,7 +43,7 @@ I can't wait to see what this new framework can do for you!
 2. Set up your OpenAPI API Key
 3. Import the required functions from ```taskgen``` and use them!
 
-# Agent Basics
+# Agent Basics - See Tutorial 1
 - Create an agent by entering your agent's name and description
 - Agents are task-based, so they will help generate subtasks to fulfil your main task
 - Agents are made to be non-verbose, so they will just focus only on task instruction (Much more efficient compared to conversational-based agentic frameworks like AutoGen)
@@ -103,7 +106,7 @@ my_agent.status()
 
 `Is Task Completed: True`
 
-# 4. Functions
+## Functions
 - Enhances ```strict_json()``` with a function-like interface for repeated use of modular LLM-based functions (or wraps external functions)
 - Use angle brackets <> to enclose input variable names. First input variable name to appear in `fn_description` will be first input variable and second to appear will be second input variable. For example, `fn_description = 'Adds up two numbers, <var1> and <var2>'` will result in a function with first input variable `var1` and second input variable `var2`
 - (Optional) If you would like greater specificity in your function's input, you can describe the variable after the : in the input variable name, e.g. `<var1: an integer from 10 to 30>`. Here, `var1` is the input variable and `an integer from 10 to 30` is the description.
@@ -175,7 +178,7 @@ str(fn)
 
 `Output: {'num_list': 'Array of numbers'}`
 
-# Power Up your Agents - Bring in Functions (aka Tools)
+## Power Up your Agents - Bring in Functions (aka Tools)
 - After creating your agent, use `assign_functions` to assign a list of functions (of class Function) to it
 - Function names will be automatically inferred if not specified
 - Proceed to run tasks by using `run()`
@@ -200,7 +203,33 @@ output = my_agent.run('Generate me a happy sentence with a number and a ball. Th
 
 `Task completed successfully!`
 
-# Inception: Agents within Agents
+## Saving and Loading Agents
+Sometimes you want to configure your agents and save them and load them elsewhere, while maintaining the current agent state
+
+- When you use the `save_agent` function, we store the entire agent's internal state, include name, description, list of functions, subtasks history and all other internal variables into a pickle file
+- When you use the `load_agent` function, and we will load the entire agent saved in the pickle file into the existing agent
+
+Key functions:
+- **save_agent(pickle_file_name: str)**: Saves the agent's internal parameters to a pickle file named pickle_file_name (include .pkl), returns the pickle file
+- **load_agent(pickle_file_name: str)**: Loads the agent's internal parameters from a pickle file named pickle_file_name (include .pkl), returns loaded agent
+
+#### Example 1: Saving Agent
+```python
+my_agent.save_agent('myagent.pkl')
+```
+
+#### Example Output
+```Agent saved to myagent.pkl```
+
+#### Example 2: Loading Agent
+```python
+new_agent = Agent().load_agent('myagent.pkl')
+```
+
+#### Example Output
+```Agent loaded from myagent.pkl```
+
+# Inception: Agents within Agents - See Tutorial 2
 - You can also create a Meta Agent that uses other Agents (referred to as Inner Agents) as functions
 - Create your Meta agent using `Agent()` (Note: No different from usual process of creating Agents - your Meta Agent is also an Agent)
 - Set up an Inner Agent list and assign it to your Meta agent using `assign_agents(agent_list)`
@@ -228,7 +257,7 @@ my_agent.assign_agents(agent_list)
 output = my_agent.run('Give me 5 menu items with name, description, ingredients and price based on Italian food choices.')
 ```
 
-# Shared Variables
+# Shared Variables - See Tutorial 3
 
 *"Because text is not enough"* - Anonymous
 
@@ -279,7 +308,7 @@ def generate_quotes(shared_variables, number_of_quotes: int, category: str):
 generate_quote_fn = Function(output_format = {}, external_fn = generate_quotes)
 ```
 
-# Memory
+# Memory - See Tutorial 4
 
 ## Key Philosophy
 - It would be important to learn from past experience and improve the agentic framework - memory is key to that
@@ -314,6 +343,21 @@ output = my_agent.run('Calculate 2**10 * (5 + 1) / 10')
 `Original Function List: add_numbers, subtract_numbers, add_three_numbers, multiply_numbers, divide_numbers, power_of, GCD_of_two_numbers, modulo_of_numbers, absolute_difference, generate_poem_with_numbers, List_related_words, generate_quote`
 
 `Filtered Function Names: add_three_numbers, multiply_numbers, divide_numbers, power_of, modulo_of_numbers`
+
+# Global Context - See Tutorial 5 (Advanced)
+- Agent takes in one additional parameter: `get_global_context`
+- This is a function that takes in the agent's internal parameters (self) and outputs a string to the LLM to append to the prompts of any LLM-based calls internally, e.g. `get_next_subtask`, `use_llm`, `reply_to_user`
+- You have full flexibility to access anything the agent knows and configure a global prompt to the agent
+
+## Uses
+- Used mainly to provide persistent variables to an agent that is not conveniently stored in `subtasks_completed`, e.g. ingredients remaining, location in grid for robot
+<br></br>
+- Implementing your own specific instructions to the default planner prompt
+    - Implement your own memory-based RAG / global prompt instruction if you need more than what the default prompt can achieve
+<br></br>
+- Avoid Multiple Similar Subtasks in `subtasks_history`
+    - If you have multiple similar subtask names, then it is likely the Agent can be confused and think it has already done the subtask
+    - In this case, you can disambiguate by resetting the agent and store the persistent information in `shared_variables` and provide it to the agent using `get_global_context`
 
 # Known Limitations
 1. As the agent uses the term "Overall Plan" for its internal planning, try not to use the word "plan" in your query or context, if not it might confuse the agent. Use alternative words like "schedule"
