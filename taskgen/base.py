@@ -420,7 +420,7 @@ def get_fn_description(my_function) -> (str, list):
 
 ### Main Functions ###
                 
-def strict_json(system_prompt: str, user_prompt: str, output_format: dict, custom_checks: dict = dict(), check_data = None, delimiter: str = '###', num_tries: int = 3, openai_json_mode: bool = False, **kwargs):
+def strict_json(system_prompt: str, user_prompt: str, output_format: dict, return_as_json = False, custom_checks: dict = dict(), check_data = None, delimiter: str = '###', num_tries: int = 3, openai_json_mode: bool = False, **kwargs):
     ''' Ensures that OpenAI will always adhere to the desired output JSON format defined in output_format. 
     Uses rule-based iterative feedback to ask GPT to self-correct.
     Keeps trying up to num_tries it it does not. Returns empty JSON if unable to after num_tries iterations.
@@ -431,6 +431,7 @@ def strict_json(system_prompt: str, user_prompt: str, output_format: dict, custo
     - output_format: Dict. JSON format with the key as the output key, and the value as the output description
     
     Inputs (optional):
+    - return_as_json: Bool. Default: False. Whether to return the output as a json. If False, returns as Python dict. If True, returns as json string
     - custom_checks: Dict. Key is output key, value is function which does checking of content for output field
     - check_data: Any data type. The additional data for custom_checks to use if required
     - delimiter: String (Default: '###'). This is the delimiter to surround the keys. With delimiter ###, key becomes ###key###
@@ -457,12 +458,15 @@ def strict_json(system_prompt: str, user_prompt: str, output_format: dict, custo
         my_user_prompt = str(user_prompt) 
             
         res = chat(my_system_prompt, my_user_prompt, response_format = {"type": "json_object"}, **kwargs)
-            
-        try:
-            loaded_json = json.loads(res)
-        except Exception as e:
-            loaded_json = {}
-        return loaded_json
+        
+        if return_as_json:
+            return res
+        else:
+            try:
+                loaded_json = json.loads(res)
+            except Exception as e:
+                loaded_json = {}
+            return loaded_json
         
     # Otherwise, implement JSON parsing using Strict JSON
     else:
@@ -507,7 +511,10 @@ Update text enclosed in <>. Be concise. Output only the json string without any 
                                 raise Exception(f'Output field of "{key}" does not meet requirement "{requirement}". Action needed: "{action_needed}"')
                             else:
                                 print('Requirement met\n\n')
-                return end_dict
+                if return_as_json:
+                    return json.dumps(end_dict, ensure_ascii=False)
+                else:
+                    return end_dict
 
             except Exception as e:
                 error_msg = f"\n\nPrevious json: {res}\njson error: {str(e)}\nFix the error."                
