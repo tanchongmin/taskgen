@@ -1,3 +1,11 @@
+5 May 2024 (v1.4.0)
+- Changed prompt of strict_json to make it compatible with more LLMs and improve performance on ChatGPT: 
+    '''\nOutput in the following json string format: {new_output_format}
+    Update text enclosed in <>. Output only a valid json string beginning with {{ and ending with }}'''
+- Fixed an error with input parameter mismatch in remove() in Memory
+- Added more external LLM examples in Tutorial 0
+- Updated all Tutorials
+
 22 Apr 2024 (v1.3.2)
 - Changes requirements.txt to dill>=0.3.7 so that it can run with colab
 - Added return_as_json = True as an input variable to strict_json (default: False, so it will be a python dictionary), so that you can get the json string as output if needed. Works also for OpenAIJson mode

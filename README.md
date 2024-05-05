@@ -1,4 +1,4 @@
-# TaskGen v1.3.2
+# TaskGen v1.4.0
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 - Video (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
@@ -42,6 +42,11 @@ I can't wait to see what this new framework can do for you!
 1. Download package via command line ```pip install taskgen-ai```
 2. Set up your OpenAPI API Key
 3. Import the required functions from ```taskgen``` and use them!
+
+## Differences in LLM for Agentic Framework
+- ChatGPT (gpt-3.5-turbo) is consistent only if you specify very clearly what you want the Agent to do and give examples of what you want
+- gpt-4-turbo and more advanced models can perform better zero-shot without much examples
+- TaskGen is compatible with ChatGPT and similar models, but for more robust use, consider using gpt-4-turbo and better models
 
 # Agent Basics - See Tutorial 1
 - Create an agent by entering your agent's name and description
@@ -243,7 +248,7 @@ my_agent = Agent('Menu Creator',
 # Define your agent list. Note you can just assign functions to the agent in place using .assign_functions(function_list)
 agent_list = [
     Agent('Chef', 'Takes in dish names and comes up with ingredients for each of them. Does not generate prices.'),
-    Agent('Boss', 'Takes in menu items and curates them according to price'),
+    Agent('Boss', ''Does final quality check on menu items'),
     Agent('Creative Writer', 'Takes in a cuisine type and generates interesting dish names and descriptions. Does not generate prices or ingredients.', max_subtasks = 2),
     Agent('Economist', 'Takes in dish names and comes up with fictitious pricing for each of them')
     ]
@@ -254,7 +259,7 @@ my_agent.assign_agents(agent_list)
 ## Run the Meta Agent
 - Let us run the agent and see the interactions between the Meta Agent and Inner Agents to solve the task!
 ```python
-output = my_agent.run('Give me 5 menu items with name, description, ingredients and price based on Italian food choices.')
+output = my_agent.run('Give me 5 menu items with name, description, ingredients and price based on Italian food choices. Ensure all parts of menu are generated.')
 ```
 
 # Shared Variables - See Tutorial 3
@@ -298,12 +303,12 @@ print('Shared Variables:', my_agent.shared_variables)
 def generate_quotes(shared_variables, number_of_quotes: int, category: str):
     ''' Generates number_of_quotes quotes about category '''
     # Retrieve from shared variables
-    my_quote_list = shared_variables['s_quote_list']
+    my_quote_list = shared_variables['quote_list']
     
     ### Add your function code here ###
     
     # Store back to shared variables
-    shared_variables['s_quote_list'] = my_quote_list
+    shared_variables['quote_list'] = my_quote_list
 
 generate_quote_fn = Function(output_format = {}, external_fn = generate_quotes)
 ```
