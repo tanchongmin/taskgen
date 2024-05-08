@@ -3,6 +3,7 @@
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 - Video (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
 - Video (Part 2): https://www.youtube.com/watch?v=OWk7moRfTPE
+- TaskGen Ask Me Anything: https://www.youtube.com/watch?v=mheIWKugqF4
 
 ### Creator's Preamble
 Happy to share that the task-based agentic framework I have been working on - TaskGen - is largely complete! 
