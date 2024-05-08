@@ -1,3 +1,10 @@
+9 May 2024 (v2.0.0)
+- HUGE: Revamped `get_subtasks_completed` to remove overall plan array, and make LLM only do single step lookahead (works much better without much hallucination of tasks)
+- HUGE: Async support added. Added async_chat, async_strict_json, async Function call in base.py
+- Reprompted `reply_user()` to respond to task completion status better if there is no query
+- Reformatted `Global Context:` in prompt to make it enclose everything in `get_global_context()`
+- Made context of `use_llm()` function better for better generation
+
 5 May 2024 (v1.4.0)
 - Changed prompt of strict_json to make it compatible with more LLMs and improve performance on ChatGPT: 
     '''\nOutput in the following json string format: {new_output_format}

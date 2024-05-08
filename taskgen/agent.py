@@ -263,7 +263,7 @@ class Agent:
         # add in global context to the prompt
         global_context = ''
         if self.get_global_context is not None:
-            global_context = 'Global Context:' + self.get_global_context(self) + '\n'
+            global_context = 'Global Context:\n```\n' + self.get_global_context(self) + '\n```\n'
         
         system_prompt = f"You are an agent named {self.agent_name} with the following description: ```{self.agent_description}```\n"
         if provide_function_list:
@@ -380,7 +380,7 @@ class Agent:
                 if self.memory_bank[name].isempty(): continue
                 rag_info += f'Related {name}: ```{self.memory_bank[name].retrieve(subtask)}```\n'
 
-            res = self.query(query = f'{rag_info}Overall Task:```{self.overall_task}```\nContext:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\nPerform the Assigned Subtask only - do not just state what has or can be done - actually generate the outcome of Assigned Subtask fully but only within your Agent Capabilities', 
+            res = self.query(query = f'{rag_info}Context:```{self.overall_task}\n{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\nGenerate a response for Assigned Subtask only - do not just state what has or can be done or apologise or repeat Assigned Subtask - actually generate the outcome of Assigned Subtask fully according to your Agent Capabilities.', 
                             output_format = {"Output": "Generate a full response to the Assigned Subtask"},
                             provide_function_list = False)
             
@@ -416,16 +416,14 @@ class Agent:
         return res
    
     def get_next_subtask(self, task = ''):
-        ''' Based on what the task is and the subtasks completed, we get the next subtask, function and input parameters'''
+        ''' Based on what the task is and the subtasks completed, we get the next subtask, function and input parameters. Supports user-given task as well if user wants to use this function directly'''
         
         if task == '':
-                background_info = f"Assigned Task:```{self.task}```\nAssigned Plan: ```{self.overall_plan}```\nPast Subtasks Completed: ```{self.subtasks_completed}```\n"
+                background_info = f"Assigned Task:```{self.task}```\nSubtasks Completed: ```{self.subtasks_completed}```\n"
         else:
             background_info = f"Assigned Task:```{task}```\n"
                 
-        # only add overall plan if there is and not evaluating for single task
-        if task == '':
-            task = ', '.join(self.overall_plan) if self.overall_plan is not None else task
+        # use default agent plan if task is not given
         task = self.task if task == '' else task
             
         # Add in memory to the Agent
@@ -439,8 +437,8 @@ class Agent:
                 rag_info += f'Related {name}: ```{self.memory_bank[name].retrieve(task)}```\n'
                 
         # First select the Equipped Function
-        res = self.query(query = f'''{background_info}{rag_info}First create an Overall Plan modified from Assigned Plan with an array of steps to do Assigned Task from beginning to end, including uncompleted steps. Then, reflect on Past Subtasks Completed (note not all past subtasks are relevant to Assigned Task) to see what steps in Overall Plan are already completed. Then, generate Overall Plan Completed that outputs True for array elements of Overall Plan that are complete and False otherwise. Then, generate the Next Step to fulfil the Assigned Task that can be performed by a single Equipped Function. If Assigned Task is completed, output end_task for Equipped Function''',
-                         output_format = {"Thoughts": "How to do Assigned Task", "Overall Plan": "Array of steps to complete Assigned Task from beginning to end, type: list", "Reflection": "What has been done and what is still left to do", "Overall Plan Completed": "Whether array elements in Overall Plan are already completed, type: List[bool]", "Next Step": "First non-completed element in Overall Plan", "Equipped Function": f"Name of Equipped Function to use for Next Step, type: Enum{list(self.function_map.keys())}", "Instruction": "Instruction for the Equipped Function if any"},
+        res = self.query(query = f'''{background_info}{rag_info}\nBased on Context and Subtasks Completed, provide the Current Subtask and Equipped Function to complete part of Assigned Task. If Assigned Task is completed, Current Subtask is End Task and Equipped Function is end_task''',
+                         output_format = {"Thoughts": "How to complete Assigned Task, End Task if completed", "Observation": "Reflect on what has been done so far for Assigned Task", "Current Subtask": "What to do now in detail, End Task if completed", "Equipped Function": "Name of Equipped Function to use for Current Subtask, end_task if completed"},
                          provide_function_list = True,
                          task = task)
         
@@ -450,13 +448,14 @@ class Agent:
                 
         # If equipped function is use_llm, or end_task, we don't need to do another query
         cur_function = self.function_map[res["Equipped Function"]]
+        
         if res["Equipped Function"] == 'use_llm':
-            res['Equipped Function Input'] = {'instruction': res['Next Step']}
+            res['Equipped Function Inputs'] = {'instruction': res['Current Subtask']}
         elif res['Equipped Function'] == 'end_task':
-            res['Equipped Function Input'] = {}
+            res['Equipped Function Inputs'] = {}
         # Otherwise, if it is only the instruction, no type check needed, so just take the instruction
         elif len(cur_function.variable_names) == 1 and cur_function.variable_names[0].lower() == "instruction":
-            res['Equipped Function Input'] = {'instruction': res['Instruction']}
+            res['Equipped Function Inputs'] = {'instruction': res['Current Subtask']}
             
         # Otherwise, do another query to get type-checked input parameters and ensure all input fields are present
         else:
@@ -474,28 +473,15 @@ class Agent:
                     
             # if there is no input, then do not need LLM to extract out function's input
             if input_format == {}:
-                res["Equipped Function Input"] = {}
+                res["Equipped Function Inputs"] = {}
                     
             else:    
-                res2 = self.query(query = f'''{background_info}{rag_info}Current Subtask: {res["Next Step"]}\nEquipped Function Name: {res["Equipped Function"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for the input parameters of the Equipped Function to fulfil Current Subtask''',
+                res2 = self.query(query = f'''{background_info}{rag_info}\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for the input parameters of the Equipped Function to fulfil Current Subtask''',
                              output_format = input_format,
                              provide_function_list = False)
-                res["Equipped Function Input"] = res2
-
-        ## End Task Overrides
-        # if the next step is already done before, then end the task. Unless it is in OS mode, then allow it
-        if res["Next Step"] in self.subtasks_completed and self.default_to_llm is True:
-            res["Equipped Function"] = "end_task"
-
-        # if whole plan is completed, end task
-        if False not in res['Overall Plan Completed']:
-            res['Equipped Function'] = 'end_task'
-
-        # save overall plan
-        if len(res['Overall Plan']) > 0:
-            self.overall_plan = res['Overall Plan']
+                res["Equipped Function Inputs"] = res2
             
-        return res["Next Step"], res["Equipped Function"], res["Equipped Function Input"]
+        return res["Current Subtask"], res["Equipped Function"], res["Equipped Function Inputs"]
         
     def add_subtask_result(self, subtask, result):
         ''' Adds the subtask and result to subtasks_completed
@@ -530,8 +516,8 @@ class Agent:
         
         my_query = self.task if query == '' else query
             
-        res = self.query(query = f'Context: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nGenerate a response to the Assigned Task using the Context only', 
-                                    output_format = {"Response to Assigned Task": "Use the Context as ground truth to respond to as many parts of the Assigned Task as possible. Do not respond with any information not from Context."},
+        res = self.query(query = f'Subtasks Completed: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nRespond to the Assigned Task in detail using information from Subtasks Completed only. Do not generate anything new.', 
+                                    output_format = {"Response to Assigned Task": "Detailed Response"},
                                     provide_function_list = False)
         
         res = res["Response to Assigned Task"]
@@ -551,6 +537,11 @@ class Agent:
             
         # Assign the task
         if task != '':
+            ### TODO: Add in Planner here to split the task into steps if sequential generation is required
+            ### Planner can also infuse diverse views if the task is more creative
+            ### Planner can also be rule-based like MCTS if it is an explore-exploit RL-style problem
+            ### Planner can also be rule-based shortest path algo if it is a navigation problem
+            
             self.task_completed = False
             # If meta agent's task is here as well, assign it too
             if overall_task != '':

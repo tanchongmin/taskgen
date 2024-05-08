@@ -1,4 +1,4 @@
-# TaskGen v1.4.0
+# TaskGen v2.0.0
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 - Video (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
@@ -363,9 +363,10 @@ output = my_agent.run('Calculate 2**10 * (5 + 1) / 10')
 - Avoid Multiple Similar Subtasks in `subtasks_history`
     - If you have multiple similar subtask names, then it is likely the Agent can be confused and think it has already done the subtask
     - In this case, you can disambiguate by resetting the agent and store the persistent information in `shared_variables` and provide it to the agent using `get_global_context`
+    - Has the benefit of shifting the Start State closer to End State desired by resetting the Agent's planning cycle
 
 # Known Limitations
-1. As the agent uses the term "Overall Plan" for its internal planning, try not to use the word "plan" in your query or context, if not it might confuse the agent. Use alternative words like "schedule"
+- To be added
 
 # Contributing to the project
 
