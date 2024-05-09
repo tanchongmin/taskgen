@@ -1,3 +1,6 @@
+9 May 2024 (v2.0.1)
+- Fixed a bug with `async_strict_json` to incorporate one `async_chat()` call instead of `chat()`
+
 9 May 2024 (v2.0.0)
 - HUGE: Revamped `get_subtasks_completed` to remove overall plan array, and make LLM only do single step lookahead (works much better without much hallucination of tasks)
 - HUGE: Async support added. Added async_chat, async_strict_json, async Function call in base.py
