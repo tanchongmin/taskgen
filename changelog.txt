@@ -1,8 +1,15 @@
+10 May 2024 (v2.1.0)
+- `Agent.assign_functions()` now takes in Python functions without need to parse into `Function` class first - output format, description and input variables will be inferred from function signature and docstring
+- `Function()` now allows just parsing the entire thing from external function, using `Function(external_fn = fn)`
+- Created Tutorial 6: External Function Interface to demonstrate the new function interfacing capabilities for TaskGen Agents and interfacing with LangChain and LlamaIndex
+- Better prompting for `get_next_subtask` to be more detailed in the next subtask
+- Made `use_llm()` aware that it is called `use_llm`, so it doesn't return an error saying it does not have that function
+
 9 May 2024 (v2.0.1)
 - Fixed a bug with `async_strict_json` to incorporate one `async_chat()` call instead of `chat()`
 
 9 May 2024 (v2.0.0)
-- HUGE: Revamped `get_subtasks_completed` to remove overall plan array, and make LLM only do single step lookahead (works much better without much hallucination of tasks)
+- HUGE: Revamped `get__next_subtask` to remove overall plan array, and make LLM only do single step lookahead (works much better without much hallucination of tasks)
 - HUGE: Async support added. Added async_chat, async_strict_json, async Function call in base.py
 - Reprompted `reply_user()` to respond to task completion status better if there is no query
 - Reformatted `Global Context:` in prompt to make it enclose everything in `get_global_context()`

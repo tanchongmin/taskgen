@@ -188,6 +188,10 @@ class Agent:
         self.function_map = {}
         # stores all existing function descriptions - prevent duplicate assignment of functions
         self.fn_description_list = []
+        
+        # reset the memory bank
+        if 'Function' in self.memory_bank:
+            memory_bank['Function'].reset()
         # adds the use llm function
         if self.default_to_llm:
             self.assign_functions([Function(fn_name = 'use_llm', 
@@ -305,8 +309,9 @@ class Agent:
             function_list = [function_list]
             
         for function in function_list:
+            # do automatic conversion of function to Function class (this is in base.py)
             if not isinstance(function, Function):
-                raise Exception('Assigned function must be of class Function')
+                function = Function(external_fn = function)
                 
             # Do not assign a function already present
             if function.fn_description in self.fn_description_list:
@@ -380,14 +385,14 @@ class Agent:
                 if self.memory_bank[name].isempty(): continue
                 rag_info += f'Related {name}: ```{self.memory_bank[name].retrieve(subtask)}```\n'
 
-            res = self.query(query = f'{rag_info}Context:```{self.overall_task}\n{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\nGenerate a response for Assigned Subtask only - do not just state what has or can be done or apologise or repeat Assigned Subtask - actually generate the outcome of Assigned Subtask fully according to your Agent Capabilities.', 
+            res = self.query(query = f'{rag_info}Context:```{self.overall_task}\n{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\nGenerate a response for Assigned Subtask only - do not just state what has or can be done or apologise or repeat Assigned Subtask - actually generate the outcome of Assigned Subtask fully according to your Agent Capabilities. Any mention of `use_llm` function refers to you', 
                             output_format = {"Output": "Generate a full response to the Assigned Subtask"},
                             provide_function_list = False)
             
-            res = res["Output"]
+            # res = res["Output"]
             
             if self.verbose: 
-                print('>', res)
+                print('>', res["Output"])
                 print()
             
         elif function_name == "end_task":
@@ -400,8 +405,8 @@ class Agent:
             res = self.function_map[function_name](**function_params, shared_variables = self.shared_variables)
 
             # if only one Output key for the json, then omit the output key
-            if len(res) == 1 and "Output" in res:
-                res = res["Output"]
+            # if len(res) == 1 and "Output" in res:
+            #     res = res["Output"]
             
             if self.verbose and res != '': 
                 print('>', res)
@@ -437,8 +442,8 @@ class Agent:
                 rag_info += f'Related {name}: ```{self.memory_bank[name].retrieve(task)}```\n'
                 
         # First select the Equipped Function
-        res = self.query(query = f'''{background_info}{rag_info}\nBased on Context and Subtasks Completed, provide the Current Subtask and Equipped Function to complete part of Assigned Task. If Assigned Task is completed, Current Subtask is End Task and Equipped Function is end_task''',
-                         output_format = {"Thoughts": "How to complete Assigned Task, End Task if completed", "Observation": "Reflect on what has been done so far for Assigned Task", "Current Subtask": "What to do now in detail, End Task if completed", "Equipped Function": "Name of Equipped Function to use for Current Subtask, end_task if completed"},
+        res = self.query(query = f'''{background_info}{rag_info}\nBased on Context and Subtasks Completed, provide the Current Subtask which can be done by a single Equipped Function to complete part of Assigned Task. If Assigned Task has been completed, Current Subtask must be End Task and Equipped Function must be end_task''',
+                         output_format = {"Thoughts": "How to complete Assigned Task in detail", "Observation": "Reflect on what has been done so far for Assigned Task", "Current Subtask": "What to do now in detail, End Task if completed", "Equipped Function": "Name of Equipped Function to use for Current Subtask, end_task if completed"},
                          provide_function_list = True,
                          task = task)
         

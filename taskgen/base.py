@@ -419,6 +419,23 @@ async def chat_async(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5
             
     return res
 
+def get_clean_typename(typ) -> str:
+    """Returns a clean, readable name for a type, including handling generics."""
+    if hasattr(typ, '__origin__'):  # Check for generic types
+        if typ.__origin__ is not None:  # Generic types, e.g., List, Dict
+            base_name = typ.__origin__.__name__
+            if hasattr(typ, '__args__') and typ.__args__ is not None:
+                args = [get_clean_typename(arg) for arg in typ.__args__]
+                return f"{base_name}[{', '.join(args)}]"
+            else:
+                return base_name  # Handle cases like `Dict` without specified parameters
+        else:  # Non-generic but special types, e.g., typing.List without parameters
+            return typ._name if hasattr(typ, '_name') else str(typ)
+    elif hasattr(typ, '__name__'):
+        return typ.__name__  # Simple types, e.g., int, str
+    else:
+        return str(typ)  # Fallback, should rarely be used
+
 def get_fn_description(my_function) -> (str, list):
     ''' Returns the modified docstring of my_function, that takes into account input variable names and types in angle brackets
     Also returns the list of input parameters to the function in sequence
@@ -426,49 +443,79 @@ def get_fn_description(my_function) -> (str, list):
     Input variables that are optional (already assigned a default value) need not be in the docstring
     args and kwargs variables are not parsed '''
      
-    # Get the signature of the function
-    if my_function.__doc__ == None:
-        return '', []
+    if not callable(my_function):
+        raise Exception(f'{my_function} is not a Python function')
+        
+    # Get the signature and type hints of the function
+    # if my_function.__doc__ == None:
+    #     return '', []
 
     signature = inspect.signature(my_function)
-    my_fn_description = my_function.__doc__
+    full_type_hints = get_type_hints(my_function)
+    my_fn_description = my_function.__doc__ if my_function.__doc__ else ''
 
     param_list = []
     # Access parameters and their types
     parameters = signature.parameters
-    if len(parameters) > 0:
-        full_param = get_type_hints(my_function)
-        for param_name, param in parameters.items():
-            # skip the shared_variables, args and kwargs
-            if param_name in ['shared_variables', 'args', 'kwargs']:
-                continue
-            # then parse the types of the param
-            param_type = param.annotation.__name__ if param.annotation != inspect.Parameter.empty else "unannotated"
-            if param_type == "unannotated":
-                new_param = f'<{param_name}>'
-            else:
-                # check if there is typing
-                if param_name in full_param:
-                    hint_str = str(full_param[param_name])
-                    if hint_str[:7] == 'typing.':
-                        param_type = hint_str[7:]
-                new_param = f'<{param_name}: {param_type}>'
+    for param_name, param in parameters.items():
+        # skip args and kwargs and shared variables
+        if param_name in ['shared_variables', 'args', 'kwargs']:
+            continue
+        
+        param_type = param.annotation.__name__ if param.annotation != inspect.Parameter.empty else "unannotated"
+        # Handle specific typing
+        if param_name in full_type_hints:
+            param_type = get_clean_typename(full_type_hints[param_name])
 
-            # Define the regular expression pattern to match 'x' as a whole word
-            pattern = re.compile(fr'\b({param_name})\b')
+        # Create new_param representation
+        new_param = f'<{param_name}: {param_type}>' if param_type != "unannotated" else f'<{param_name}>'
+
+        # Pattern to find the parameter in the docstring
+        pattern = re.compile(fr'\b({param_name})\b')
+        
+        # Substitute the parameter in the docstring
+        if pattern.search(my_fn_description):
+            my_fn_description = pattern.sub(new_param, my_fn_description)
+            param_list.append(param_name)
+            
+        # otherwise, function description will just be the function signature
+        else:
+            # add a continuation if description is current empty
+            if my_fn_description != '':
+                my_fn_description += ', '
                 
-            # Check if param occurs as a whole word in the docstring
-            if pattern.search(my_fn_description):
-                # Substitute each input variable x with <x> or <x: type>
-                my_fn_description = pattern.sub(new_param, my_fn_description)
-                # add this variable to the param_list
-                param_list.append(param_name)
-            else:
-                # raise exception if the parameter is not already initialised (aka LLM needs to come up with the input)
-                if param.default == inspect.Parameter.empty:
-                    raise Exception(f'Input variable "{param_name}" not in docstring of "{my_function.__name__}"')
-    
+            param_list.append(param_name)
+            print(f'Input variable "{param_name}" not in docstring of "{my_function.__name__}". Adding it to docstring')
+            my_fn_description += f'Input: {new_param}'
+            
+            if param.default != inspect.Parameter.empty:
+                my_fn_description += f', default: {param.default}'
+
     return my_fn_description, param_list
+
+def get_fn_output(my_function) -> (dict):
+    ''' Returns the dictionary of output parameters and types of the form {"Output 1": "Type", "Output 2": "Type"}'''
+     
+    if not callable(my_function):
+        raise Exception(f'{my_function} is not a Python function')
+        
+    # Initialize the output format dictionary
+    output_format = {}
+
+    full_type_hints = get_type_hints(my_function)
+    my_fn_description = my_function.__doc__
+
+    # Check for return annotation
+    if 'return' in full_type_hints:
+        return_type = full_type_hints['return']
+        # Adjust dictionary according to the return type
+        if isinstance(return_type, tuple):
+            for idx, type_hint in enumerate(return_type):
+                output_format[f"output_{idx + 1}"] = get_clean_typename(type_hint)
+        else:
+            output_format["output_1"] = get_clean_typename(return_type)
+
+    return output_format
 
 ### Main Functions ###
                 
@@ -716,6 +763,8 @@ Can also be done automatically by providing docstring with input variable names 
         '''
         
         self.fn_description = ''
+        self.output_format = {}
+        
         # this is only for external functions
         self.external_param_list = [] 
         if external_fn is not None:
@@ -726,18 +775,22 @@ Can also be done automatically by providing docstring with input variable names 
                     type_check = True
             if type_check:
                 print('Note: Type checking (type:) not done for External Functions')
-            # take function description from external_fn if provided and default fn_description not provided
+            
+            # get details from docstring of external function only if fn_description is not given
             if fn_description == '':
                 self.fn_description, self.external_param_list = get_fn_description(external_fn)
+            
+            # get the output format from the function signature
+            self.output_format = get_fn_output(external_fn)             
             
         # if function description provided, use it to update the function description
         if fn_description != '':
             self.fn_description = fn_description
-        # if there is no external function docstring provided, raise an error
-        elif self.fn_description == '':
-            raise Exception('Input variable "fn_description" (or docstring for External Functions) not provided')
 
-        self.output_format = output_format
+        # if output format is provided, use it to update the function output format
+        if output_format != {}:
+            self.output_format = output_format
+            
         self.examples = examples
         self.external_fn = external_fn
         self.is_compulsory = is_compulsory
@@ -852,7 +905,10 @@ Can also be done automatically by providing docstring with input variable names 
                     fn_output = [fn_output]
 
                 for i in range(len(fn_output)):
-                    res[output_keys[i]] = fn_output[i]
+                    if len(output_keys) > i:
+                        res[output_keys[i]] = fn_output[i]
+                    else:
+                        res[f'output_{i+1}'] = fn_output[i]
         
         # check if any of the output variables have a s_, which means we update the shared_variables and not output it
         keys = list(res.keys())
@@ -926,7 +982,10 @@ Can also be done automatically by providing docstring with input variable names 
                     fn_output = [fn_output]
 
                 for i in range(len(fn_output)):
-                    res[output_keys[i]] = fn_output[i]
+                    if len(output_keys) > i:
+                        res[output_keys[i]] = fn_output[i]
+                    else:
+                        res[f'output_{i+1}'] = fn_output[i]
         
         # check if any of the output variables have a s_, which means we update the shared_variables and not output it
         keys = list(res.keys())
