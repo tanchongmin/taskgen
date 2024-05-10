@@ -1,4 +1,4 @@
-# TaskGen v2.1.0
+# TaskGen v2.1.1
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 - Video (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
@@ -164,25 +164,27 @@ b2d(10) #x
 
 #### Example fn_description inferred from type hints and docstring of External Function
 ```python
-# Docstring must provide all compulsory input variables
+# Docstring must provide all input variables
 # We will ignore shared_variables, *args and **kwargs
-def add_number_to_list(num1: int, num_list: list, other_var: bool = True, *args, **kwargs):
+from typing import List
+def add_number_to_list(num1: int, num_list: List[int], *args, **kwargs) -> List[int]:
     '''Adds num1 to num_list'''
     num_list.append(num1)
     return num_list
 
 fn = Function(external_fn = add_number_to_list, 
-    output_format = {'num_array': 'Array of numbers'})
+    #output_format = {'num_array': 'Array of numbers'} ## If you would like to name output variables (helps with LLM understanding), define your own output_format
+             )
 
 str(fn)
 ```
 
 #### Example Output
-`Description: Adds <num1: int> to <num_list: list>`
+`Description: Adds Adds <num1: int> to <num_list: list[int]>`
 
 `Input: ['num1', 'num_list']`
 
-`Output: {'num_list': 'Array of numbers'}`
+`Output: {'output_1': 'list[int]'}`
 
 ## Power Up your Agents - Bring in Functions (aka Tools)
 - After creating your agent, use `assign_functions` to assign a list of functions (of class Function) to it

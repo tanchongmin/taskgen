@@ -1,3 +1,7 @@
+10 May 2024 (v2.1.1)
+- Ensure that external_fn must be a Python function and not a Class method, as the latter does not encompass all the necessary input variables
+- Better prompting for `get_next_subtask` to end task more effectively when Assigned Task is completed
+
 10 May 2024 (v2.1.0)
 - `Agent.assign_functions()` now takes in Python functions without need to parse into `Function` class first - output format, description and input variables will be inferred from function signature and docstring
 - `Function()` now allows just parsing the entire thing from external function, using `Function(external_fn = fn)`

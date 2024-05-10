@@ -442,8 +442,8 @@ class Agent:
                 rag_info += f'Related {name}: ```{self.memory_bank[name].retrieve(task)}```\n'
                 
         # First select the Equipped Function
-        res = self.query(query = f'''{background_info}{rag_info}\nBased on Context and Subtasks Completed, provide the Current Subtask which can be done by a single Equipped Function to complete part of Assigned Task. If Assigned Task has been completed, Current Subtask must be End Task and Equipped Function must be end_task''',
-                         output_format = {"Thoughts": "How to complete Assigned Task in detail", "Observation": "Reflect on what has been done so far for Assigned Task", "Current Subtask": "What to do now in detail, End Task if completed", "Equipped Function": "Name of Equipped Function to use for Current Subtask, end_task if completed"},
+        res = self.query(query = f'''{background_info}{rag_info}\nBased on Context and Subtasks Completed, provide the Current Subtask and the corresponding Equipped Function to complete a part of Assigned Task. If Assigned Task is completed, Current Subtask is End Task and Equipped Function is end_task''',
+                         output_format = {"Thoughts": "How to complete Assigned Task, End Task if completed", "Observation": "Reflect on what has been done so far for Assigned Task", "Current Subtask": "What to do now in detail, End Task if completed", "Equipped Function": "Name of Equipped Function to use for Current Subtask, end_task if completed"},
                          provide_function_list = True,
                          task = task)
         

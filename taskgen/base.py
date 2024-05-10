@@ -443,7 +443,7 @@ def get_fn_description(my_function) -> (str, list):
     Input variables that are optional (already assigned a default value) need not be in the docstring
     args and kwargs variables are not parsed '''
      
-    if not callable(my_function):
+    if not inspect.isfunction(my_function):
         raise Exception(f'{my_function} is not a Python function')
         
     # Get the signature and type hints of the function
@@ -493,10 +493,10 @@ def get_fn_description(my_function) -> (str, list):
 
     return my_fn_description, param_list
 
-def get_fn_output(my_function) -> (dict):
+def get_fn_output(my_function) -> dict:
     ''' Returns the dictionary of output parameters and types of the form {"Output 1": "Type", "Output 2": "Type"}'''
      
-    if not callable(my_function):
+    if not inspect.isfunction(my_function):
         raise Exception(f'{my_function} is not a Python function')
         
     # Initialize the output format dictionary
@@ -780,8 +780,9 @@ Can also be done automatically by providing docstring with input variable names 
             if fn_description == '':
                 self.fn_description, self.external_param_list = get_fn_description(external_fn)
             
-            # get the output format from the function signature
-            self.output_format = get_fn_output(external_fn)             
+            # get the output format from the function signature if output format is not given
+            if output_format == {}:
+                self.output_format = get_fn_output(external_fn)             
             
         # if function description provided, use it to update the function description
         if fn_description != '':
