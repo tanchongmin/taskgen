@@ -1,3 +1,14 @@
+18 May 2024 (v2.2.0)
+- Added color for output text of Agent
+- Made `get_next_subtasks` and `use_llm` prompts more versatile
+- Improved definitions of `use_llm` and `end_task` default functions for Agent
+- Added `summarise_subtasks_count` for `Agent`, which summarises Subtasks Completed every `summarise_subtasks_count` iterations according to overall task
+- Fixed issue with Hierarchical Agents whereby the memory_bank's `Function` key in `Agent` class was overwritten by instantating of new agents. Turns out that input variables of type dict will get carried over to all instantiations of the Class. We have to set it as None, and define the dictionary within the function to prevent this
+- Fixed the dictionary input variables to None for `strict_json` and `Function` and `Ranker` as well
+- Added a `retrieve_fn` in `Memory` class to enable vector database queries
+- split function.py from base.py as it was getting large
+- type: code introduced for `strict_json` so we won't force to unicode for all strings with //
+
 10 May 2024 (v2.1.1)
 - Ensure that external_fn must be a Python function and not a Class method, as the latter does not encompass all the necessary input variables
 - Better prompting for `get_next_subtask` to end task more effectively when Assigned Task is completed

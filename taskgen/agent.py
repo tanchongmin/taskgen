@@ -4,7 +4,10 @@ from openai import OpenAI
 import numpy as np
 import copy
 import dill as pickle
+from termcolor import colored
+
 from .base import *
+from .function import *
 
 ### Helper Functions
 def top_k_index(lst, k):
@@ -17,7 +20,7 @@ def top_k_index(lst, k):
 ### Main Classes
 class Ranker:
     ''' This defines the ranker which outputs a similarity score given a query and a key'''
-    def __init__(self, model = "text-embedding-3-small", ranking_fn = None, database = dict()):
+    def __init__(self, model = "text-embedding-3-small", ranking_fn = None, database = None):
         '''
         model: Str. The name of the model for the host
         ranking_fn: Function. If provided, this will be used to do similarity ranking instead. 
@@ -27,6 +30,9 @@ class Ranker:
         so that you do not need to redo already obtained embeddings. 
         New embeddings will also be automatically stored to the database so that you do not have to redo in the future'''
         
+        if database is None:
+            database = {}
+            
         self.model = model
         self.ranking_fn = ranking_fn
         self.database = database
@@ -75,20 +81,29 @@ class Memory:
         - `ranker`: `Ranker`. The Ranker which defines a similarity score between a query and a key. Default: OpenAI `text-embedding-3-small` model. 
             - Can be replaced with a function which returns similarity score from 0 to 1 when given a query and key
      '''
-    def __init__(self, memory: list = [], top_k: int = 3, mapper = lambda x: x, approach = 'retrieve_by_ranker', llm = None, ranker = Ranker()):
+    
+    def __init__(self, memory: list = [], top_k: int = 3, mapper = lambda x: x, approach = 'retrieve_by_ranker', llm = None, retrieve_fn = None, ranker = None):
         self.memory = memory
         self.top_k = top_k
         self.mapper = mapper
         self.approach = approach
-        self.ranker = ranker
+        if ranker is None:
+            self.ranker = Ranker()
+        else:
+            self.ranker = ranker
+        self.retrieve_fn = retrieve_fn
         self.llm = llm
         
     def retrieve(self, task: str) -> list:
         ''' Performs retrieval of top_k similar memories according to approach stated '''
-        if self.approach == 'retrieve_by_ranker':
-            return self.retrieve_by_ranker(task)
+        # if you have your own vector search function, implement it in retrieve_fn. Takes in a task and outputs the top-k results
+        if self.retrieve_fn is not None:
+            return self.retrieve_fn(task)
         else:
-            return self.retrieve_by_llm(task)
+            if self.approach == 'retrieve_by_ranker':
+                return self.retrieve_by_ranker(task)
+            else:
+                return self.retrieve_by_llm(task)
         
     def retrieve_by_ranker(self, task: str) -> list:
         ''' Performs retrieval of top_k similar memories 
@@ -132,8 +147,9 @@ class Agent:
     def __init__(self, agent_name: str = 'Helpful Assistant',
                  agent_description: str = 'A generalist agent meant to help solve problems',
                  max_subtasks: int = 5,
-                 memory_bank = {'Function': Memory(top_k = 5, mapper = lambda x: x.fn_name + ': ' + x.fn_description, approach = 'retrieve_by_ranker')},
-                 shared_variables = dict(),
+                 summarise_subtasks_count: int = 3,
+                 memory_bank = None,
+                 shared_variables = None,
                  get_global_context = None,
                  default_to_llm = True,
                  verbose: bool = True,
@@ -150,12 +166,13 @@ class Agent:
         Inputs:
         - agent_name: String. Name of agent, hinting at what the agent does
         - agent_description: String. Short description of what the agent does
-        - max_subtasks: Int. The maximum number of subtasks the agent can have
+        - max_subtasks: Int. Default: 5. The maximum number of subtasks the agent can have
+        - summarise_subtasks_count: Int. Default: 3. The maximum number of subtasks in Subtasks Completed before summary happens
         - memory_bank: class Dict[Memory]. Stores multiple types of memory for use by the agent. Customise the Memory config within the Memory class.
             - Key: `Function` (Already Implemented Natively) - Does RAG over Task -> Function mapping
             - Can add in more keys that would fit your use case. Retrieves similar items to task / overall plan (if able) for additional context in `get_next_subtasks()` and `use_llm()` function
             - For RAG over Documents, it is best done in a function of the Agent to retrieve more information when needed (so that we do not overload the Agent with information)
-        - shared_variables. Dict. Default: empty dict. Stores the variables to be shared amongst inner functions and agents. 
+        - shared_variables. Dict. Default: None. Stores the variables to be shared amongst inner functions and agents. 
             If not empty, will pass this dictionary by reference down to the inner agents and functions
         - get_global_context. Function. Takes in self (agent variable) and returns the additional prompt (str) to be appended to `get_next_subtask` and `use_llm`. Allows for persistent agent states to be added to the prompt
         - default_to_llm. Bool. Default: True. Whether to default to use_llm function if there is no match to other functions. If False, use_llm will not be given to Agent
@@ -170,15 +187,26 @@ class Agent:
         self.agent_name = agent_name
         self.agent_description = agent_description
         self.max_subtasks = max_subtasks
+        self.summarise_subtasks_count = summarise_subtasks_count
         self.verbose = verbose
-        self.memory_bank = memory_bank
-        self.shared_variables = shared_variables
         self.default_to_llm = default_to_llm
         self.get_global_context = get_global_context
 
         self.debug = debug
         self.llm = llm
-
+        
+        # set shared variables
+        if shared_variables is None:
+            self.shared_variables = {}
+        else:
+            self.shared_variables = shared_variables
+        # set memory bank
+        if memory_bank is None:
+            self.memory_bank = {'Function': Memory(top_k = 5, mapper = lambda x: x.fn_name + ': ' + x.fn_description, approach = 'retrieve_by_ranker')}
+            self.memory_bank['Function'].reset()
+        else:
+            self.memory_bank = memory_bank
+            
         # reset agent's state
         self.reset()
 
@@ -189,18 +217,15 @@ class Agent:
         # stores all existing function descriptions - prevent duplicate assignment of functions
         self.fn_description_list = []
         
-        # reset the memory bank
-        if 'Function' in self.memory_bank:
-            memory_bank['Function'].reset()
         # adds the use llm function
         if self.default_to_llm:
             self.assign_functions([Function(fn_name = 'use_llm', 
-                                        fn_description = f'Used only when no other function can do the task', 
+                                        fn_description = f'For general tasks. Used only when no other function can do the task', 
                                         is_compulsory = True,
                                         output_format = {"Output": "Output of LLM"})])
         # adds the end task function
         self.assign_functions([Function(fn_name = 'end_task',
-                                       fn_description = 'Use only when task is completed',
+                                       fn_description = 'Use only after task is completed',
                                        is_compulsory = True,
                                        output_format = {})])
         
@@ -258,7 +283,9 @@ class Agent:
         # if we have a task to focus on, we can filter the functions (other than use_llm and end_task) by that task
         filtered_fn_list = None
         if task != '':
+            # filter the functions
             filtered_fn_list = self.memory_bank['Function'].retrieve(task)
+            
             # add back compulsory functions (default: use_llm, end_task) if present in function_map
             for name, function in self.function_map.items():
                 if function.is_compulsory:
@@ -293,13 +320,14 @@ class Agent:
         print('Available Functions:', list(self.function_map.keys()))
         if len(self.shared_variables) > 0:
             print('Shared Variables:', list(self.shared_variables.keys()))
-        print('Task:', self.task)
+        print(colored(f'Task: {self.task}', 'green', attrs = ['bold']))
         if len(self.subtasks_completed) == 0: 
-            print("Subtasks Completed: None")
+            print(colored("Subtasks Completed: None", 'blue', attrs = ['bold']))
         else:
-            print('Subtasks Completed:')
+            print(colored('Subtasks Completed:', 'black', attrs = ['bold']))
             for key, value in self.subtasks_completed.items():
-                print(f"Subtask: {key}\n{value}\n")
+                print(colored(f"Subtask: {key}", 'blue', attrs = ['bold']))
+                print(f'{value}\n')
         print('Is Task Completed:', self.task_completed)
         
     ## Functions for function calling ##
@@ -327,7 +355,7 @@ class Agent:
             
             # add function's description into fn_description_list
             self.fn_description_list.append(function.fn_description)
-                                    
+                        
             # add function to memory bank for RAG over functions later on if is not a compulsory functions
             if not function.is_compulsory:
                 self.memory_bank['Function'].append(function)
@@ -383,16 +411,14 @@ class Agent:
                 if name == 'Function': continue
                 # Do not need to add to context if the memory item is empty
                 if self.memory_bank[name].isempty(): continue
-                rag_info += f'Related {name}: ```{self.memory_bank[name].retrieve(subtask)}```\n'
+                rag_info += f'Memory for {name}: ```{self.memory_bank[name].retrieve(subtask)}```\n'
 
-            res = self.query(query = f'{rag_info}Context:```{self.overall_task}\n{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\nGenerate a response for Assigned Subtask only - do not just state what has or can be done or apologise or repeat Assigned Subtask - actually generate the outcome of Assigned Subtask fully according to your Agent Capabilities. Any mention of `use_llm` function refers to you', 
-                            output_format = {"Output": "Generate a full response to the Assigned Subtask"},
+            res = self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the use_llm function that generates a detailed outcome for the Assigned Subtask. You do not need to talk to the user, just give the output', 
+                            output_format = {"Output": "Your detailed outcome for Assigned Subtask"},
                             provide_function_list = False)
             
-            # res = res["Output"]
-            
             if self.verbose: 
-                print('>', res["Output"])
+                print(f"> {res['Output']}")
                 print()
             
         elif function_name == "end_task":
@@ -403,13 +429,9 @@ class Agent:
                 print(f'Calling function {function_name} with parameters {function_params}')
                 
             res = self.function_map[function_name](**function_params, shared_variables = self.shared_variables)
-
-            # if only one Output key for the json, then omit the output key
-            # if len(res) == 1 and "Output" in res:
-            #     res = res["Output"]
             
             if self.verbose and res != '': 
-                print('>', res)
+                print(f"> {res}")
                 print()
                 
         if stateful:
@@ -439,14 +461,21 @@ class Agent:
             # Do not need to add to context if the memory item is empty
             if self.memory_bank[name].isempty(): continue
             else:
-                rag_info += f'Related {name}: ```{self.memory_bank[name].retrieve(task)}```\n'
+                rag_info += f'Memory for {name}: ```{self.memory_bank[name].retrieve(task)}```\n'
                 
         # First select the Equipped Function
-        res = self.query(query = f'''{background_info}{rag_info}\nBased on Context and Subtasks Completed, provide the Current Subtask and the corresponding Equipped Function to complete a part of Assigned Task. If Assigned Task is completed, Current Subtask is End Task and Equipped Function is end_task''',
-                         output_format = {"Thoughts": "How to complete Assigned Task, End Task if completed", "Observation": "Reflect on what has been done so far for Assigned Task", "Current Subtask": "What to do now in detail, End Task if completed", "Equipped Function": "Name of Equipped Function to use for Current Subtask, end_task if completed"},
-                         provide_function_list = True,
-                         task = task)
-        
+        res = self.query(query = f'''{background_info}{rag_info}\nBased on Context, Memory and Subtasks Completed, provide the Current Subtask and the corresponding Equipped Function to complete a part of Assigned Task''',
+         output_format = {"Observation": "Reflect on what has been done in Subtasks Completed for Assigned Task", 
+                          "Thoughts": "Brainstorm on how to complete the remainder of Assigned Task, if any, using Equipped Functions. End Task if Assigned Task completed", 
+                          "Current Subtask": "What to do now in detail that can be done by one Equipped Function for Assigned Task", 
+                          "Equipped Function": "Name of Equipped Function to use for Current Subtask"},
+         provide_function_list = True,
+         task = task)
+
+        if self.verbose:
+            print(colored(f"Observation: {res['Observation']}", 'black', attrs = ['bold']))
+            print(colored(f"Thoughts: {res['Thoughts']}", 'green', attrs = ['bold']))
+            
         # end task if equipped function is incorrect
         if res["Equipped Function"] not in self.function_map:
             res["Equipped Function"] = "end_task"
@@ -481,7 +510,7 @@ class Agent:
                 res["Equipped Function Inputs"] = {}
                     
             else:    
-                res2 = self.query(query = f'''{background_info}{rag_info}\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for the input parameters of the Equipped Function to fulfil Current Subtask''',
+                res2 = self.query(query = f'''{background_info}{rag_info}\n\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for the input parameters of the Equipped Function to fulfil Current Subtask''',
                              output_format = input_format,
                              provide_function_list = False)
                 res["Equipped Function Inputs"] = res2
@@ -574,22 +603,22 @@ class Agent:
                 if function_name == 'end_task':
                     self.task_completed = True
                     if self.verbose:
+                        print(colored(f"Subtask identified: End Task", "blue", attrs=['bold']))
                         print('Task completed successfully!\n')
                     break
                     
-                if self.verbose: print('Subtask identified:', subtask)
+                if self.verbose: 
+                    print(colored(f"Subtask identified: {subtask}", "blue", attrs=['bold']))
 
                 # Execute the function for next step
                 res = self.use_function(function_name, function_params, subtask)
-                         
-            # check if overall task is complete at the last step if num_steps > 1
-            if not self.task_completed and num_subtasks > 1:
-                subtask, function_name, function_params = self.get_next_subtask()
-                if function_name == "end_task":
-                    self.task_completed = True
-                    if self.verbose:
-                        print('Task completed successfully!\n')
-
+                
+                # Summarise Subtasks Completed if necessary
+                if len(self.subtasks_completed) > self.summarise_subtasks_count:
+                    print('### Auto-summarising Subtasks Completed ###')
+                    self.summarise_subtasks_completed(f'progress for {self.overall_task}')
+                    print('### End of Auto-summary ###\n')
+          
         return list(self.subtasks_completed.values())
     
     ## This is for Multi-Agent uses
