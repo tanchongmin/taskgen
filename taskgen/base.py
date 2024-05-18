@@ -142,6 +142,7 @@ def check_datatype(field, key: dict, data_type: str, **kwargs):
         # check for string
         if data_type.lower() == 'str':
             try:
+                # convert to string and remove escape characters from indents and quotations
                 field = str(field)
             except Exception as e:
                 pass
@@ -278,12 +279,30 @@ def check_key(field: str, output_format, new_output_format, delimiter: str, deli
             field = ast.literal_eval(field)
         except Exception as e:
             pass
-        
-        return field
+        return remove_unicode_escape(field)
     
     # otherwise just return the value
     else:
         return field
+    
+def remove_unicode_escape(my_datatype):
+    ''' Removes the unicode escape character from the ending string in my_datatype (can be nested) '''
+    if isinstance(my_datatype, dict):
+        output_d = {}
+        # wrap keys with delimiters
+        for key, value in my_datatype.items():
+            output_d[key] = remove_unicode_escape(value)
+        return output_d
+    elif isinstance(my_datatype, list):
+        return [remove_unicode_escape(item) for item in my_datatype]
+    # if it is a string, remove the unicode escape characters from it, so code can be run
+    elif isinstance(my_datatype, str):
+        # only do decoding for code if backslash present
+        if '\\' in my_datatype:
+            my_datatype = my_datatype.replace('\\n','\n').replace('\\t','\t').replace('\\"','\"').replace("\\'","\'").replace("â\x80\x99", "'")
+        return my_datatype
+    else:
+        return my_datatype
     
 def wrap_with_angle_brackets(d: dict, delimiter: str, delimiter_num: int) -> dict:
     ''' Changes d to output_d by wrapping delimiters over the keys, and putting angle brackets on the values 

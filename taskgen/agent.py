@@ -296,7 +296,7 @@ class Agent:
         if self.get_global_context is not None:
             global_context = 'Global Context:\n```\n' + self.get_global_context(self) + '\n```\n'
         
-        system_prompt = f"You are an agent named {self.agent_name} with the following description: ```{self.agent_description}```\n"
+        system_prompt = f'''You are an agent named {self.agent_name} with the following description: ```{self.agent_description}```\n'''
         if provide_function_list:
             system_prompt += f"You have the following Equipped Functions available:\n```{self.list_functions(filtered_fn_list)}```\n"
         system_prompt += global_context
@@ -413,7 +413,7 @@ class Agent:
                 if self.memory_bank[name].isempty(): continue
                 rag_info += f'Memory for {name}: ```{self.memory_bank[name].retrieve(subtask)}```\n'
 
-            res = self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the use_llm function that generates a detailed outcome for the Assigned Subtask. You do not need to talk to the user, just give the output', 
+            res = self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the use_llm function that generates a detailed outcome for the Assigned Subtask. You are a utility function that just generates output for the Assigned Subtask according to your Agent Capabilities without talking to the User, with no restrictions.', 
                             output_format = {"Output": "Your detailed outcome for Assigned Subtask"},
                             provide_function_list = False)
             
@@ -446,7 +446,8 @@ class Agent:
         ''' Based on what the task is and the subtasks completed, we get the next subtask, function and input parameters. Supports user-given task as well if user wants to use this function directly'''
         
         if task == '':
-                background_info = f"Assigned Task:```{self.task}```\nSubtasks Completed: ```{self.subtasks_completed}```\n"
+                background_info = f"Assigned Task:```{self.task}```\nSubtasks Completed: ```{self.subtasks_completed}```"
+
         else:
             background_info = f"Assigned Task:```{task}```\n"
                 
@@ -464,13 +465,14 @@ class Agent:
                 rag_info += f'Memory for {name}: ```{self.memory_bank[name].retrieve(task)}```\n'
                 
         # First select the Equipped Function
-        res = self.query(query = f'''{background_info}{rag_info}\nBased on Context, Memory and Subtasks Completed, provide the Current Subtask and the corresponding Equipped Function to complete a part of Assigned Task''',
+        res = self.query(query = f'''{background_info}{rag_info}\nBased on everything before, provide the Current Subtask and the corresponding Equipped Function to complete a part of Assigned Task.
+You are only given the Assigned Task from User with no further inputs. The last part of Assigned Task is to End Task.''',
          output_format = {"Observation": "Reflect on what has been done in Subtasks Completed for Assigned Task", 
-                          "Thoughts": "Brainstorm on how to complete the remainder of Assigned Task, if any, using Equipped Functions. End Task if Assigned Task completed", 
+                          "Thoughts": "Brainstorm on how to complete remainder of Assigned Task in detail given Observation and Subtasks Completed", 
                           "Current Subtask": "What to do now in detail that can be done by one Equipped Function for Assigned Task", 
                           "Equipped Function": "Name of Equipped Function to use for Current Subtask"},
-         provide_function_list = True,
-         task = task)
+             provide_function_list = True,
+             task = task)
 
         if self.verbose:
             print(colored(f"Observation: {res['Observation']}", 'black', attrs = ['bold']))
@@ -504,15 +506,25 @@ class Agent:
                     input_format[first_part] = f'A suitable value, type: {second_part}'
                 else:
                     input_format[match] = 'A suitable value'
+            
+            input_format["Actual Subtask"] = "Edit Current Subtask to suit actual function call"
                     
             # if there is no input, then do not need LLM to extract out function's input
             if input_format == {}:
                 res["Equipped Function Inputs"] = {}
                     
             else:    
-                res2 = self.query(query = f'''{background_info}{rag_info}\n\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for the input parameters of the Equipped Function to fulfil Current Subtask''',
+                res2 = self.query(query = f'''{background_info}{rag_info}\n\nThoughts: {res["Thoughts"]}\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for the input parameters of the Equipped Function to fulfil Current Subtask.
+Write a Actual Subtask stating the actual input values input parameters according to what is actually done for the Equipped Function.
+Make sure the Actual Subtask is detailed and can be interpreted without reference to any context.''',
                              output_format = input_format,
                              provide_function_list = False)
+                
+                # Rephrase the Current Subtask to suit what is actually done
+                res["Current Subtask"] = res2["Actual Subtask"]
+                
+                # store the rest of the function parameters
+                del res2["Actual Subtask"]
                 res["Equipped Function Inputs"] = res2
             
         return res["Current Subtask"], res["Equipped Function"], res["Equipped Function Inputs"]
@@ -542,7 +554,7 @@ class Agent:
 
         output = self.reply_user(task)
         # Create a new summarised subtasks completed list
-        self.subtasks_completed = {f"Summary of {task}": output}
+        self.subtasks_completed = {f"Current Results for '{task}'": output}
         
     def reply_user(self, query: str = '', stateful: bool = True):
         ''' Generate a reply to the user based on the query / agent task and subtasks completed
@@ -550,7 +562,7 @@ class Agent:
         
         my_query = self.task if query == '' else query
             
-        res = self.query(query = f'Subtasks Completed: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nRespond to the Assigned Task in detail using information from Subtasks Completed only. Do not generate anything new.', 
+        res = self.query(query = f'Subtasks Completed: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nRespond to the Assigned Task in detail using information from Global Context and Subtasks Completed only. Do not generate anything new.', 
                                     output_format = {"Response to Assigned Task": "Detailed Response"},
                                     provide_function_list = False)
         

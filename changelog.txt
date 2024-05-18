@@ -1,3 +1,9 @@
+18 May 2024 (v2.3.0)
+- Changed Agent main prompt in `query()` and `use_llm()` and `get_subtasks_completed()` and `reply_user()` to better reflect Agent is helping User to complete Assigned Task without needing any input from User, or to output directly to User. ChatGPT's prompting is heavily biased to helping Users, so it helps the Agent output much better
+- After generating parameters for the Equipped Functions, we will modify the Current Subtask to better match what is done in the Equipped Functions. This helps the Agent better understand what has been done
+- Added back unicode_escape decoding in `strict_json`, but it doesn't decode for all unicode escapes, just \\t, \\n, \\' and \\". Using type: code will do for all unicode escapes
+
+
 18 May 2024 (v2.2.0)
 - Added color for output text of Agent
 - Made `get_next_subtasks` and `use_llm` prompts more versatile
