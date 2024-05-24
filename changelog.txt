@@ -1,8 +1,25 @@
+24 May 2024 (v2.3.1)
+- Hierarchical Agents:
+    - Inner agents will no longer be able to modify meta agent's subtasks
+    - Inner agents will be outputting a summary of what they have done via reply_user() instead of everything that they have done
+- Global Context: Added option to provide global context as a string with <var> that will be replaced with corresponding names in shared_variables at run-time (variable global_context)
+- Shared Variables: Added an 'agent' shared variables which points to itself, so that functions can access anything the agent has access to
+- Memory: Changed Memory prompt to Knowledge Reference for better understanding by LLM
+- Next Subtask:
+    - Changed End Task (end_task) description to "Passes the final output to the user", so as to help map the end task action to reply user action which the LLM understands better
+    - Modified the prompt for `get_subtasks_completed()` to better reflect that no further user input is expected, and not to repeat previous subtasks unless really needed, and that no user output is needed
+    - Current Subtask generated is now with greater detail and with all context needed
+    - Better input variable generation for Equipped Function for Agents
+    - Modified the prompt the `use_llm()` function to know it is part of Agent
+    - Changed the `summarise_subtasks_count` to 5 so that it doesn't summarise too often
+- StrictJSON: 
+    - Fixed nested array issue whereby we did not process nested Array[] due to not including that as part of regex (List[] works)
+    - type: code now converts python```code``` -> code, which makes it more versatile for LLM code generation
+
 18 May 2024 (v2.3.0)
-- Changed Agent main prompt in `query()` and `use_llm()` and `get_subtasks_completed()` and `reply_user()` to better reflect Agent is helping User to complete Assigned Task without needing any input from User, or to output directly to User. ChatGPT's prompting is heavily biased to helping Users, so it helps the Agent output much better
+- Changed Agent main prompt in `use_llm()` and `get_subtasks_completed()` and `reply_user()` to better reflect Agent is helping User to complete Assigned Task without needing any input from User, or to output directly to User. ChatGPT's prompting is heavily biased to helping Users, so it helps the Agent output much better
 - After generating parameters for the Equipped Functions, we will modify the Current Subtask to better match what is done in the Equipped Functions. This helps the Agent better understand what has been done
 - Added back unicode_escape decoding in `strict_json`, but it doesn't decode for all unicode escapes, just \\t, \\n, \\' and \\". Using type: code will do for all unicode escapes
-
 
 18 May 2024 (v2.2.0)
 - Added color for output text of Agent

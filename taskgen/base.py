@@ -137,6 +137,13 @@ def check_datatype(field, key: dict, data_type: str, **kwargs):
         for num in range(len(field)):
             field[num] = check_datatype(field[num], 'array element of '+key, internal_data_type, **kwargs)
             
+    match = re.search(r"array\[(.*)\]", data_type, re.IGNORECASE)
+    if match:
+        internal_data_type = match.group(1)  # Extract the content inside the brackets
+        # do processing for internal elements
+        for num in range(len(field)):
+            field[num] = check_datatype(field[num], 'array element of '+key, internal_data_type, **kwargs)
+            
     # if it is not nested, check individually
     else:
         # check for string
@@ -160,6 +167,10 @@ def check_datatype(field, key: dict, data_type: str, **kwargs):
             field = bytes(field, "utf-8").decode("unicode_escape")
             # replace aprostrophes
             field = field.replace("â\x80\x99", "'")
+            # remove the python and ```, whitespace at the front and back of code if any
+            field = re.sub(r"^(\s|`)*(?i:python)?\s*", "", field)
+            # Removes whitespace & ` from end
+            field = re.sub(r"(\s|`)*$", "", field)
                 
         # check for int
         if data_type.lower() == 'int':

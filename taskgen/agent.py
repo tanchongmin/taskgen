@@ -147,10 +147,11 @@ class Agent:
     def __init__(self, agent_name: str = 'Helpful Assistant',
                  agent_description: str = 'A generalist agent meant to help solve problems',
                  max_subtasks: int = 5,
-                 summarise_subtasks_count: int = 3,
+                 summarise_subtasks_count: int = 5,
                  memory_bank = None,
                  shared_variables = None,
                  get_global_context = None,
+                 global_context = '',
                  default_to_llm = True,
                  verbose: bool = True,
                  debug: bool = False,
@@ -175,6 +176,7 @@ class Agent:
         - shared_variables. Dict. Default: None. Stores the variables to be shared amongst inner functions and agents. 
             If not empty, will pass this dictionary by reference down to the inner agents and functions
         - get_global_context. Function. Takes in self (agent variable) and returns the additional prompt (str) to be appended to `get_next_subtask` and `use_llm`. Allows for persistent agent states to be added to the prompt
+        - global_context. String. Additional global context in string form. Put in variables to substitute for shared_variables using <>
         - default_to_llm. Bool. Default: True. Whether to default to use_llm function if there is no match to other functions. If False, use_llm will not be given to Agent
         - verbose: Bool. Default: True. Whether to print out intermediate thought processes of the Agent
         - debug: Bool. Default: False. Whether to debug StrictJSON messages
@@ -191,6 +193,7 @@ class Agent:
         self.verbose = verbose
         self.default_to_llm = default_to_llm
         self.get_global_context = get_global_context
+        self.global_context = global_context
 
         self.debug = debug
         self.llm = llm
@@ -200,6 +203,9 @@ class Agent:
             self.shared_variables = {}
         else:
             self.shared_variables = shared_variables
+        # append agent to shared variables, so that functions have access to it
+        self.shared_variables['agent'] = self
+        
         # set memory bank
         if memory_bank is None:
             self.memory_bank = {'Function': Memory(top_k = 5, mapper = lambda x: x.fn_name + ': ' + x.fn_description, approach = 'retrieve_by_ranker')}
@@ -225,7 +231,7 @@ class Agent:
                                         output_format = {"Output": "Output of LLM"})])
         # adds the end task function
         self.assign_functions([Function(fn_name = 'end_task',
-                                       fn_description = 'Use only after task is completed',
+                                       fn_description = 'Passes the final output to the user',
                                        is_compulsory = True,
                                        output_format = {})])
         
@@ -291,17 +297,26 @@ class Agent:
                 if function.is_compulsory:
                     filtered_fn_list.append(function)
                 
-        # add in global context to the prompt
+        # add in global context string and replace it with shared_variables as necessary
+        global_context_string = self.global_context
+        matches = re.findall(r'<(.*?)>', global_context_string)
+        for match in matches:
+            if match in self.shared_variables:
+                global_context_string = global_context_string.replace(f'<{match}>', str(self.shared_variables[match]))
+                
+        # add in the global context function's output
+        global_context_output = self.get_global_context(self) if self.get_global_context is not None else ''
+            
         global_context = ''
-        if self.get_global_context is not None:
-            global_context = 'Global Context:\n```\n' + self.get_global_context(self) + '\n```\n'
+        # Add in global context if present
+        if global_context_string != '' or global_context_output != '':
+            global_context = 'Global Context:\n```\n' + global_context_string + '\n' + global_context_output + '```\n'
         
         system_prompt = f'''You are an agent named {self.agent_name} with the following description: ```{self.agent_description}```\n'''
         if provide_function_list:
             system_prompt += f"You have the following Equipped Functions available:\n```{self.list_functions(filtered_fn_list)}```\n"
         system_prompt += global_context
         system_prompt += query
-        
         
         res = strict_json(system_prompt = system_prompt,
         user_prompt = '',
@@ -411,14 +426,14 @@ class Agent:
                 if name == 'Function': continue
                 # Do not need to add to context if the memory item is empty
                 if self.memory_bank[name].isempty(): continue
-                rag_info += f'Memory for {name}: ```{self.memory_bank[name].retrieve(subtask)}```\n'
+                rag_info += f'Knowledge Reference for {name}: ```{self.memory_bank[name].retrieve(subtask)}```\n'
 
-            res = self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the use_llm function that generates a detailed outcome for the Assigned Subtask. You are a utility function that just generates output for the Assigned Subtask according to your Agent Capabilities without talking to the User, with no restrictions.', 
-                            output_format = {"Output": "Your detailed outcome for Assigned Subtask"},
+            res = self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the taking the role of the utility function `use_llm` that generates a detailed outcome for the Assigned Subtask on behalf of {self.agent_name}, according to your Agent Capabilities without talking to the User, with no restrictions.', 
+                            output_format = {"Detailed Outcome": "Your detailed outcome for Assigned Subtask"},
                             provide_function_list = False)
             
             if self.verbose: 
-                print(f"> {res['Output']}")
+                print(f"> {res['Detailed Outcome']}")
                 print()
             
         elif function_name == "end_task":
@@ -431,8 +446,10 @@ class Agent:
             res = self.function_map[function_name](**function_params, shared_variables = self.shared_variables)
             
             if self.verbose and res != '': 
-                print(f"> {res}")
-                print()
+                # skip the printing if this is Agent output, as we have printed elsewhere already
+                if 'Agent Output' not in res: 
+                    print(f"> {res}")
+                    print()
                 
         if stateful:
             if res == '':
@@ -462,14 +479,14 @@ class Agent:
             # Do not need to add to context if the memory item is empty
             if self.memory_bank[name].isempty(): continue
             else:
-                rag_info += f'Memory for {name}: ```{self.memory_bank[name].retrieve(task)}```\n'
+                rag_info += f'Knowledge Reference for {name}: ```{self.memory_bank[name].retrieve(task)}```\n'
                 
         # First select the Equipped Function
         res = self.query(query = f'''{background_info}{rag_info}\nBased on everything before, provide the Current Subtask and the corresponding Equipped Function to complete a part of Assigned Task.
-You are only given the Assigned Task from User with no further inputs. The last part of Assigned Task is to End Task.''',
+You are only given the Assigned Task from User with no further inputs. Do not do more than required. The last subtask of Assigned Task is End Task''',
          output_format = {"Observation": "Reflect on what has been done in Subtasks Completed for Assigned Task", 
-                          "Thoughts": "Brainstorm on how to complete remainder of Assigned Task in detail given Observation and Subtasks Completed", 
-                          "Current Subtask": "What to do now in detail that can be done by one Equipped Function for Assigned Task", 
+                          "Thoughts": "Brainstorm how to complete remainder of Assigned Task only given Observation, End Task if completed", 
+                          "Current Subtask": "What to do now in detail with all context provided that can be done by one Equipped Function for Assigned Task", 
                           "Equipped Function": "Name of Equipped Function to use for Current Subtask"},
              provide_function_list = True,
              task = task)
@@ -514,9 +531,9 @@ You are only given the Assigned Task from User with no further inputs. The last 
                 res["Equipped Function Inputs"] = {}
                     
             else:    
-                res2 = self.query(query = f'''{background_info}{rag_info}\n\nThoughts: {res["Thoughts"]}\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for the input parameters of the Equipped Function to fulfil Current Subtask.
-Write a Actual Subtask stating the actual input values input parameters according to what is actually done for the Equipped Function.
-Make sure the Actual Subtask is detailed and can be interpreted without reference to any context.''',
+                res2 = self.query(query = f'''{background_info}{rag_info}\n\nThoughts: {res["Thoughts"]}\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for {matches} to fulfil Current Subtask.
+Write an Updated Subtask stating the actual input values according to what is actually done for the Equipped Function.
+Make sure the Updated Subtask is detailed and can be interpreted without reference to any context.''',
                              output_format = input_format,
                              provide_function_list = False)
                 
@@ -556,19 +573,20 @@ Make sure the Actual Subtask is detailed and can be interpreted without referenc
         # Create a new summarised subtasks completed list
         self.subtasks_completed = {f"Current Results for '{task}'": output}
         
-    def reply_user(self, query: str = '', stateful: bool = True):
+    def reply_user(self, query: str = '', stateful: bool = True, verbose: bool = True):
         ''' Generate a reply to the user based on the query / agent task and subtasks completed
-        If stateful, also store this interaction into the subtasks_completed'''
+        If stateful, also store this interaction into the subtasks_completed
+        If verbose is given, can also override the verbosity of this function'''
         
         my_query = self.task if query == '' else query
             
-        res = self.query(query = f'Subtasks Completed: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nRespond to the Assigned Task in detail using information from Global Context and Subtasks Completed only. Do not generate anything new.', 
+        res = self.query(query = f'Subtasks Completed: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nRespond to the Assigned Task in detail using information from Global Context and Subtasks Completed only. Be factual and do not generate any new information.', 
                                     output_format = {"Response to Assigned Task": "Detailed Response"},
                                     provide_function_list = False)
         
         res = res["Response to Assigned Task"]
         
-        if self.verbose:
+        if self.verbose and verbose:
             print(res)
         
         if stateful:
@@ -627,7 +645,7 @@ Make sure the Actual Subtask is detailed and can be interpreted without referenc
                 
                 # Summarise Subtasks Completed if necessary
                 if len(self.subtasks_completed) > self.summarise_subtasks_count:
-                    print('### Auto-summarising Subtasks Completed ###')
+                    print('### Auto-summarising Subtasks Completed (Change frequency via `summarise_subtasks_count` variable) ###')
                     self.summarise_subtasks_completed(f'progress for {self.overall_task}')
                     print('### End of Auto-summary ###\n')
           
@@ -641,7 +659,7 @@ Make sure the Actual Subtask is detailed and can be interpreted without referenc
         # makes the agent appear as a function that takes in an instruction and outputs the executed instruction
         my_fn = Function(fn_name = self.agent_name,
                              fn_description = f'Agent Description: ```{self.agent_description}```\nExecutes the given <instruction>',
-                             output_format = {"Output": "Output of instruction"},
+                             output_format = {"Agent Output": "Output of instruction"},
                              external_fn = Agent_External_Function(self, meta_agent))
         
         return my_fn
@@ -678,9 +696,20 @@ class Agent_External_Function:
         agent_copy.shared_variables = self.meta_agent.shared_variables
         
         # provide the subtasks completed and debug capabilities to the inner agents too
+        agent_copy.reset()
         agent_copy.debug = self.meta_agent.debug
-        agent_copy.subtasks_completed = self.meta_agent.subtasks_completed
+        if len(self.meta_agent.subtasks_completed) > 0:
+            agent_copy.global_context += f'Related Subtasks Completed: {self.meta_agent.subtasks_completed}'
+        agent_copy.subtasks_completed = {}
 
         output = agent_copy.run(instruction, self.meta_agent.overall_task)
+        
+        # append result of inner agent to meta agent
+        agent_copy.verbose = False
+        agent_reply = agent_copy.reply_user()
+        
         if self.agent.verbose:
+            print(colored(f'###\nReply from {self.agent.agent_name} to {self.meta_agent.agent_name}:\n{agent_reply}\n###\n', 'magenta', attrs = ['bold']))
             print(f'### End of Inner Agent: {self.agent.agent_name} ###\n')
+            
+        return agent_reply
