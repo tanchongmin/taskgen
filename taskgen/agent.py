@@ -1,6 +1,7 @@
 import heapq
 import importlib
 import subprocess
+import sys
 import openai
 from openai import OpenAI
 import numpy as np
@@ -466,17 +467,36 @@ class {agent_class_name}(Agent):
             raise Exception(f"Error: {response.status_code}, {response.json()}")
         
     @classmethod
-    def load_community_agent(self, agent_name: str):
+    def load_community_agent(cls, agent_name: str):
+        # Convert the agent name to the expected class name
         agent_class_name = agent_name.title().replace(" ", "")
-        directory = f'{os.path.dirname(os.path.abspath(__file__))}/../contrib/community/{agent_class_name}'
-        module_path = f'{directory}/main.py'
+        
+        # Construct the full directory path where the agent and its dependencies reside
+        directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../contrib/community', agent_class_name)
+        
+        # Construct the full path to the main.py file within the agent's directory
+        module_path = os.path.join(directory, 'main.py')
+        
+        # Check if the module file exists, raise an exception if not
         if not os.path.exists(module_path):
             raise Exception(f"Agent {agent_name} does not exist in the community")
         
+        # Add the directory to sys.path to ensure dependencies can be imported
+        if directory not in sys.path:
+            sys.path.insert(0, directory)
+        
+        # Load the module from the given file location
         spec = importlib.util.spec_from_file_location(agent_class_name, module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-
+        
+        # Remove the directory from sys.path after loading to clean up
+        try:
+            sys.path.remove(directory)
+        except ValueError:
+            pass  # Handle the case where the directory was not added or already removed
+        
+        # Check if the module has the expected class, and instantiate it if it does
         if hasattr(module, agent_class_name):
             return getattr(module, agent_class_name)()
         else:
