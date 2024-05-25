@@ -386,6 +386,18 @@ Can also be done automatically by providing docstring with input variable names 
 
         return res
     
+    def get_python_representation(self):
+        fn_initialization = f"""Function(
+            fn_name="{self.fn_name}",
+            fn_description="{self.fn_description}",
+            output_format={self.output_format},
+            examples={self.examples},
+            external_fn={self.external_fn.__name__ if self.external_fn else None},
+            is_compulsory={self.is_compulsory})
+        """
+        external_fn_code = inspect.getsource(self.external_fn) if self.external_fn else None
+        return (fn_initialization, external_fn_code)
+
 ### Legacy Support
     
 # alternative name for strict_function (it is now called Function)

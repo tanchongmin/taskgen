@@ -1,10 +1,14 @@
 import heapq
+import importlib
+import subprocess
 import openai
 from openai import OpenAI
 import numpy as np
 import copy
 import dill as pickle
+import requests
 from termcolor import colored
+import os
 
 from .base import *
 from .function import *
@@ -263,6 +267,221 @@ class Agent:
             print(f"Agent loaded from {filename}")
             return self
         
+    def contribute_agent(self) -> str:
+        if os.environ['GITHUB_USERNAME'] is None:
+            raise Exception('Please set your GITHUB_USERNAME in the environment variables')
+        if os.environ['GITHUB_TOKEN'] is None:
+            raise Exception('Please set your GITHUB_TOKEN in the environment variables')
+        
+        owner = "simbianai"
+        repo = "taskgen"
+
+        fork_url = self._create_taskgen_fork_for_user(owner, repo)
+        directory = self._persist_agent()
+        contrib_branch_name = self._commit_and_push_to_fork(fork_url, directory)
+        pr_url = self._create_pull_request(owner, repo, fork_url, contrib_branch_name)
+        return f"Pull Request created successfully at {pr_url}"
+    
+    def _create_taskgen_fork_for_user(self, owner, repo):
+        url = f"https://api.github.com/repos/{owner}/{repo}/forks"
+        response = requests.get(url)
+        current_fork_owners = [fork['owner']['login'] for fork in response.json()]
+
+        if os.environ['GITHUB_USERNAME'] in current_fork_owners:
+            if self.verbose:
+                print(f"{os.environ['GITHUB_USERNAME']} already has a fork of taskgen")
+            return [fork['clone_url'] for fork in response.json() if fork['owner']['login'] == os.environ['GITHUB_USERNAME']][0]
+        else:
+            headers = {
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                "X-GitHub-Api-Version": "2022-11-28"
+            }
+
+            data = {
+                "name": "taskgen",
+                "default_branch_only": True
+            }
+
+            response = requests.post(url, headers=headers, json=data)
+
+            if response.status_code == 202:
+                if self.verbose:
+                    print("Fork created successfully")
+                return response.json()['clone_url']
+            else:
+                raise Exception(f"Fork creation failed. Error: [{response.status_code}]{response.json()}")
+
+    def _get_python_representation(self, directory, agent_class_name):
+        functions_code = ""
+        functions_keys = []
+        supporting_functions = ""
+
+        sub_agents_imports = ""
+        sub_agents_keys = []
+        sub_agents_code = ""
+
+        for name, function in self.function_map.items():
+            if name in 'use_llm' or name in 'end_task':
+                continue
+            if function.external_fn is not None and isinstance(function.external_fn, Agent_External_Function):
+                sub_agent_class_name = function.external_fn.agent.agent_name.title().replace(" ", "")
+                sub_agent_code = function.external_fn.agent._get_python_representation(directory, sub_agent_class_name)
+
+                sub_agent_contrib_path = f"{directory}/{sub_agent_class_name}.py"
+                with open(sub_agent_contrib_path, 'w') as f:
+                    f.write(sub_agent_code)
+
+                sub_agents_imports += f"from {sub_agent_class_name} import {sub_agent_class_name}\n"
+                sub_agents_keys.append(f"var_agent_{sub_agent_class_name}")
+                sub_agents_code += f"        var_agent_{sub_agent_class_name} = {sub_agent_class_name}()\n"
+                continue
+
+            functions_keys.append(f"var_{name}")
+
+            function_code, external_fn_code = function.get_python_representation()
+            functions_code += f"        var_{name} = {function_code}\n"
+            if external_fn_code is not None:
+                supporting_functions += f"{external_fn_code}"
+
+        agent_code = f"""from taskgen import Agent, Function
+{sub_agents_imports}
+
+# Author: @{os.environ['GITHUB_USERNAME']}
+class {agent_class_name}(Agent):
+    def __init__(self):
+{functions_code}
+{sub_agents_code}
+        super().__init__(
+            agent_name="{self.agent_name}",
+            agent_description="{self.agent_description}",
+            max_subtasks="{self.max_subtasks}",
+            summarise_subtasks_count="{self.summarise_subtasks_count}",
+            default_to_llm="{self.default_to_llm}",
+            verbose="{self.verbose}",
+            debug="{self.debug}"
+        )
+
+        self.assign_functions(
+            [{','.join(functions_keys)}]
+        )
+
+        self.assign_agents(
+            [{','.join(sub_agents_keys)}]
+        )
+                        
+# Supporting Functions
+{supporting_functions}
+"""
+        return agent_code
+        
+    def _persist_agent(self):
+        agent_class_name = self.agent_name.title().replace(" ", "")
+
+        # TODO: We should update this to refer to contrib module to avoid string reference
+        directory = f'{os.path.dirname(os.path.abspath(__file__))}/../contrib/community/{agent_class_name}'
+        contrib_path = f'{directory}/main.py'
+        if os.path.exists(directory):
+            raise Exception(f"Directory {directory} already exists. Confirm if agent already exists.")
+        os.makedirs(directory)
+
+        agent_code = self._get_python_representation(directory, agent_class_name)
+
+        with open(contrib_path, 'w') as f:
+            f.write(agent_code)
+        return directory
+            
+
+    def _commit_and_push_to_fork(self, fork_url, directory):
+        def run_command(command):
+            """Run a shell command and handle errors."""
+            result = subprocess.run(command, shell=True, check=True, text=True, capture_output=True)
+            return result.stdout
+        
+        agent_class_name = directory.split('/')[-1]
+        try:
+            current_remotes = run_command("git remote -v")
+            current_remote_aliases = [remote.split('\t')[0] for remote in current_remotes.split('\n')]
+            owner_fork_alias = [remote.split('\t')[0] for remote in current_remotes.split('\n') if fork_url in remote]
+            if len(owner_fork_alias) == 0:
+                owner_fork_alias = "fork"
+                while owner_fork_alias in current_remote_aliases:
+                    owner_fork_alias += "_1"
+                run_command(f"git remote add {owner_fork_alias} {fork_url}")
+                if self.verbose:
+                    print(f"Fork added as remote. Using new fork - {owner_fork_alias}")
+            else:
+                owner_fork_alias = owner_fork_alias[0]
+                if self.verbose:
+                    print(f"Fork already exists as remote. Using existing fork - {owner_fork_alias}")
+                
+            cur_branch = run_command("git branch --show-current")
+            all_branches = [branch[2:] for branch in run_command("git branch -a").split('\n') if branch != '']
+
+            contrib_branch_name = f"contribute-agent-{agent_class_name}"
+            if contrib_branch_name in all_branches:
+                raise Exception(f"Branch {contrib_branch_name} already exists. Please delete the branch and try again.")
+            if f"remotes/{owner_fork_alias}/{contrib_branch_name}" in all_branches:
+                raise Exception(f"Branch {contrib_branch_name} already exists. Please delete the branch and try again.")
+            
+            run_command(f'git add {directory}/*')
+            run_command(f'git checkout -b {contrib_branch_name}')
+            run_command(f'git commit -m "Contribute agent: {self.agent_name}"')
+            run_command(f'git push {owner_fork_alias} {contrib_branch_name}')
+            run_command(f'git checkout {cur_branch}')
+
+            if self.verbose:
+                print(f"Pushed changes to fork {owner_fork_alias} in branch {contrib_branch_name} successfully")
+            return contrib_branch_name
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"Error occurred: {e.stderr}")
+
+    def _create_pull_request(self, owner, repo, fork_url, contrib_branch_name):
+        url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
+
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+            "X-GitHub-Api-Version": "2022-11-28"
+        }
+
+        data = {
+            "title": f"Contribute agent: {self.agent_name}",
+            "body": f"""Agent Details:
+- Agent Name: {self.agent_name}
+- Agent Description: {self.agent_description}
+""",
+            "head_repo": f"{fork_url.split('/')[-1].split('.')[0]}",
+            "head": f"{os.environ['GITHUB_USERNAME']}:{contrib_branch_name}",
+            "base": "main"
+        }
+
+        response = requests.post(url, headers=headers, json=data)
+
+        if response.status_code == 201:
+            if self.verbose:
+                print("Pull request created successfully")
+            return response.json()['html_url']
+        else:
+            raise Exception(f"Error: {response.status_code}, {response.json()}")
+        
+    @classmethod
+    def load_community_agent(self, agent_name: str):
+        agent_class_name = agent_name.title().replace(" ", "")
+        directory = f'{os.path.dirname(os.path.abspath(__file__))}/../contrib/community/{agent_class_name}'
+        module_path = f'{directory}/main.py'
+        if not os.path.exists(module_path):
+            raise Exception(f"Agent {agent_name} does not exist in the community")
+        
+        spec = importlib.util.spec_from_file_location(agent_class_name, module_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        if hasattr(module, agent_class_name):
+            return getattr(module, agent_class_name)()
+        else:
+            raise AttributeError(f"The class {agent_class_name} does not exist in the module {module_path}")
+    
     ## Generic Functions ##
     def reset(self):
         ''' Resets agent state, including resetting subtasks_completed '''
