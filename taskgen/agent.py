@@ -10,6 +10,8 @@ import dill as pickle
 import requests
 from termcolor import colored
 import os
+import inspect
+from taskgen.utils import get_source_code_for_func
 
 from .base import *
 from .function import *
@@ -72,6 +74,9 @@ class Ranker:
         
         else:
             return self.ranking_fn(query, key)
+        
+    def get_python_representation(self) -> str:
+        return f"Ranker(model='{self.model}', ranking_fn={inspect.getsource(self.ranking_fn) if self.ranking_fn else None})"
         
 class Memory:
     ''' Retrieves top k memory items based on task 
@@ -148,6 +153,9 @@ class Memory:
         ''' Returns whether or not the memory is empty '''
         return self.memory == []
     
+    def get_python_representation(self, include_memory_elements) -> str:
+        return f"Memory(memory={self.memory if include_memory_elements else []}, top_k={self.top_k}, mapper={get_source_code_for_func(self.mapper)}, approach='{self.approach}', ranker={self.ranker.get_python_representation() if self.ranker else None})"
+    
 class Agent:
     def __init__(self, agent_name: str = 'Helpful Assistant',
                  agent_description: str = 'A generalist agent meant to help solve problems',
@@ -208,12 +216,14 @@ class Agent:
             self.shared_variables = {}
         else:
             self.shared_variables = shared_variables
+        self.init_shared_variables = copy.deepcopy(self.shared_variables)
         # append agent to shared variables, so that functions have access to it
         self.shared_variables['agent'] = self
         
+        self.default_memory = Memory(top_k = 5, mapper = lambda x: x.fn_name + ': ' + x.fn_description, approach = 'retrieve_by_ranker')
         # set memory bank
         if memory_bank is None:
-            self.memory_bank = {'Function': Memory(top_k = 5, mapper = lambda x: x.fn_name + ': ' + x.fn_description, approach = 'retrieve_by_ranker')}
+            self.memory_bank = {'Function': self.default_memory}
             self.memory_bank['Function'].reset()
         else:
             self.memory_bank = memory_bank
@@ -343,9 +353,31 @@ class Agent:
             function_code, external_fn_code = function.get_python_representation()
             functions_code += f"        var_{name} = {function_code}\n"
             if external_fn_code is not None:
-                supporting_functions += f"{external_fn_code}"
+                supporting_functions += f"{external_fn_code}\n"
+        
+        memory_bank_code = "{"
+        for key, memory in self.memory_bank.items():
+            memory_bank_code += f"'{key}': {memory.get_python_representation(memory != self.default_memory)},"
+        memory_bank_code += "}"
 
-        agent_code = f"""from taskgen import Agent, Function
+        shared_variables_code = "{"
+        for key, value in self.init_shared_variables.items():
+            if isinstance(value, Memory):
+                shared_variables_code += f"'{key}': {value.get_python_representation(True)},"
+            else:
+                shared_variables_code += f"'{key}': {value},"
+        shared_variables_code += "}"
+
+        get_global_context_ref = None
+        if self.get_global_context:
+            if inspect.isfunction(self.get_global_context) and self.get_global_context.__name__ == "<lambda>":
+                get_global_context_ref = get_source_code_for_func(self.get_global_context)
+            else:
+                get_global_context_ref = self.get_global_context.__name__
+                supporting_functions += f"{get_source_code_for_func(self.get_global_context)}\n"
+
+        agent_code = f"""from taskgen import Agent, Function, Memory, Ranker
+import math
 {sub_agents_imports}
 
 # Author: @{os.environ['GITHUB_USERNAME']}
@@ -355,9 +387,13 @@ class {agent_class_name}(Agent):
 {sub_agents_code}
         super().__init__(
             agent_name="{self.agent_name}",
-            agent_description="{self.agent_description}",
+            agent_description='''{self.agent_description}''',
             max_subtasks="{self.max_subtasks}",
             summarise_subtasks_count="{self.summarise_subtasks_count}",
+            memory_bank={memory_bank_code},
+            shared_variables={shared_variables_code},
+            get_global_context={get_global_context_ref},
+            global_context='''{self.global_context}''',
             default_to_llm="{self.default_to_llm}",
             verbose="{self.verbose}",
             debug="{self.debug}"
