@@ -7,6 +7,8 @@ import copy
 import inspect
 from typing import get_type_hints
 from openai import OpenAI
+
+from taskgen.utils import get_source_code_for_func
 from .base import *
 
 ### Helper Functions ###
@@ -386,6 +388,28 @@ Can also be done automatically by providing docstring with input variable names 
 
         return res
     
+    def get_python_representation(self):
+        """Returns a Python representation of the Function object, including the external function code if available."""
+        external_fn_code = None
+        external_fn_ref = None
+
+        if self.external_fn:
+            if inspect.isfunction(self.external_fn) and self.external_fn.__name__ == "<lambda>":
+                external_fn_ref = get_source_code_for_func(self.external_fn)
+            else:
+                external_fn_ref = self.external_fn.__name__
+                external_fn_code = get_source_code_for_func(self.external_fn)
+
+        fn_initialization = f"""Function(
+            fn_name="{self.fn_name}",
+            fn_description='''{self.fn_description}''',
+            output_format={self.output_format},
+            examples={self.examples},
+            external_fn={external_fn_ref},
+            is_compulsory={self.is_compulsory})
+        """
+        return (fn_initialization, external_fn_code)
+
 ### Legacy Support
     
 # alternative name for strict_function (it is now called Function)
