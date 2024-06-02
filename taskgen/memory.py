@@ -154,7 +154,4 @@ class AsyncMemory(BaseMemory):
         top_k_indices = res[f'top_{self.top_k}_list']
         return [self.memory[index] for index in top_k_indices]
 
-    def get_python_representation(self, include_memory_elements) -> str:
-        return f"Memory(memory={self.memory if include_memory_elements else []}, top_k={self.top_k}, mapper={get_source_code_for_func(self.mapper)}, approach='{self.approach}', ranker={self.ranker.get_python_representation() if self.ranker else None})"
-
 
