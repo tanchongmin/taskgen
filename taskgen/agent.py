@@ -96,9 +96,6 @@ class BaseAgent:
         # stores all existing function descriptions - prevent duplicate assignment of functions
         self.fn_description_list = []
         
-    
-        
-        
     def reset(self):
         ''' Resets agent state, including resetting subtasks_completed '''
         self.assign_task('No task assigned')
@@ -116,7 +113,6 @@ class BaseAgent:
         self.task_completed = False
         self.overall_plan = None
         
-    
     def save_agent(self, filename: str):
         ''' Saves the entire agent to filename for reuse next time '''
         
@@ -144,6 +140,7 @@ class BaseAgent:
             self = pickle.load(file)
             print(f"Agent loaded from {filename}")
             return self
+        
     def status(self):
         ''' Prints prettily the update of the agent's status. 
         If you would want to reference any agent-specific variable, just do so directly without calling this function '''
@@ -208,34 +205,7 @@ class BaseAgent:
             removed_item = self.subtasks_completed.popitem()
         if self.verbose:
             print(f'Removed last subtask from subtasks_completed: {removed_item}')  
-    
-    list_function = list_functions
-    print_function = print_functions
-  
-  
-  
-  
-         
-class Agent(BaseAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.default_memory = Memory(top_k = 5, mapper = lambda x: x.fn_name + ': ' + x.fn_description, approach = 'retrieve_by_ranker')
-        if self.memory_bank is None:
-            self.memory_bank = {'Function': self.default_memory}
-            self.memory_bank['Function'].reset()
             
-            # adds the use llm function
-        if self.default_to_llm:
-            self.assign_functions([Function(fn_name = 'use_llm', 
-                                        fn_description = f'For general tasks. Used only when no other function can do the task', 
-                                        is_compulsory = True,
-                                        output_format = {"Output": "Output of LLM"})])
-        # adds the end task function
-        self.assign_functions([Function(fn_name = 'end_task',
-                                       fn_description = 'Passes the final output to the user',
-                                       is_compulsory = True,
-                                       output_format = {})])
-        
     def contribute_agent(self) -> str:
         if os.environ['GITHUB_USERNAME'] is None:
             raise Exception('Please set your GITHUB_USERNAME in the environment variables')
@@ -495,6 +465,37 @@ class {agent_class_name}(Agent):
             return getattr(module, agent_class_name)()
         else:
             raise AttributeError(f"The class {agent_class_name} does not exist in the module {module_path}")
+    
+    # Alternate names
+    list_function = list_functions
+    list_tools = list_functions
+    list_tool = list_functions
+    print_function = print_functions
+    print_tools = print_functions
+    print_tool = print_functions
+    remove_tool = remove_function
+  
+
+## Sync Version of Agent
+class Agent(BaseAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.default_memory = Memory(top_k = 5, mapper = lambda x: x.fn_name + ': ' + x.fn_description, approach = 'retrieve_by_ranker')
+        if self.memory_bank is None:
+            self.memory_bank = {'Function': self.default_memory}
+            self.memory_bank['Function'].reset()
+            
+            # adds the use llm function
+        if self.default_to_llm:
+            self.assign_functions([Function(fn_name = 'use_llm', 
+                                        fn_description = f'For general tasks. Used only when no other function can do the task', 
+                                        is_compulsory = True,
+                                        output_format = {"Output": "Output of LLM"})])
+        # adds the end task function
+        self.assign_functions([Function(fn_name = 'end_task',
+                                       fn_description = 'Passes the final output to the user',
+                                       is_compulsory = True,
+                                       output_format = {})])
         
         
     def query(self, query: str, output_format: dict, provide_function_list: bool = False, task: str = ''):
@@ -544,14 +545,17 @@ class {agent_class_name}(Agent):
 
         return res
       
-       ## Functions for function calling ##
-    
+    ## Functions for function calling ##
     def assign_functions(self, function_list: list):
         ''' Assigns a list of functions to be used in function_map '''
         if not isinstance(function_list, list):
             function_list = [function_list]
             
         for function in function_list:
+            # If this function is an Agent, parse it accordingly
+            if isinstance(function, BaseAgent):
+                function = self.to_function(self)
+            
             # do automatic conversion of function to Function class (this is in base.py)
             if not isinstance(function, Function):
                 function = Function(external_fn = function)
@@ -826,12 +830,16 @@ Make sure the Updated Subtask is detailed and can be interpreted without referen
         self.assign_functions([agent.to_function(self) for agent in agent_list])
         return self
     
-        ## Function aliaises
-    assign_function = assign_functions
-    assign_agent = assign_agents
     ## Function aliaises
+    assign_function = assign_functions
+    assign_tool = assign_functions
+    assign_tools = assign_functions
+    select_tool = select_function
+    use_tool = use_function
+    assign_agent = assign_agents
+    
  
-
+## Async Version of Agent
 class AsyncAgent(BaseAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -911,6 +919,10 @@ class AsyncAgent(BaseAgent):
             function_list = [function_list]
             
         for function in function_list:
+            # If this function is an Agent, parse it accordingly
+            if isinstance(function, BaseAgent):
+                function = self.to_function(self)
+                
             # do automatic conversion of function to Function class (this is in base.py)
             if not isinstance(function, AsyncFunction):
                 function = AsyncFunction(external_fn = function)
@@ -935,10 +947,6 @@ class AsyncAgent(BaseAgent):
                 self.memory_bank['Function'].append(function)
             
         return self
-        
- 
-        
-
         
     async def select_function(self, task: str = ''):
         ''' Based on the task (without any context), output the next function name and input parameters '''
@@ -1084,9 +1092,6 @@ Make sure the Updated Subtask is detailed and can be interpreted without referen
             
         return res["Current Subtask"], res["Equipped Function"], res["Equipped Function Inputs"]
         
- 
-
-        
     async def summarise_subtasks_completed(self, task: str = ''):
         ''' Summarise the subtasks_completed list according to task '''
 
@@ -1192,9 +1197,13 @@ Make sure the Updated Subtask is detailed and can be interpreted without referen
         self.assign_functions([agent.to_function(self) for agent in agent_list])
         return self
     
+    ## Function aliaises
     assign_function = assign_functions
+    assign_tool = assign_functions
+    assign_tools = assign_functions
+    select_tool = select_function
+    use_tool = use_function
     assign_agent = assign_agents
-    
     
 class Base_Agent_External_Function:
     ''' Creates a Function-based version of the agent '''
