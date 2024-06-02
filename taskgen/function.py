@@ -1,15 +1,10 @@
-import os
-import openai
-import json
 import re
-import ast
-import copy
 import inspect
 from typing import get_type_hints
-from openai import OpenAI
+from taskgen import strict_json
+from taskgen.base_async import strict_json_async
 
-from taskgen.utils import get_source_code_for_func
-from .base import *
+from taskgen.utils import ensure_awaitable, get_source_code_for_func
 
 ### Helper Functions ###
 
@@ -30,7 +25,7 @@ def get_clean_typename(typ) -> str:
     else:
         return str(typ)  # Fallback, should rarely be used
 
-def get_fn_description(my_function) -> (str, list):
+def get_fn_description(my_function):
     ''' Returns the modified docstring of my_function, that takes into account input variable names and types in angle brackets
     Also returns the list of input parameters to the function in sequence
     e.g.: Adds numbers x and y -> Adds numbers <x: int> and <y: int>
@@ -113,7 +108,7 @@ def get_fn_output(my_function) -> dict:
 
 ### Main Class ###
 
-class Function:
+class BaseFunction:
     def __init__(self,
                  fn_description: str = '', 
                  output_format: dict = None,
@@ -122,7 +117,6 @@ class Function:
                  is_compulsory = False,
                  fn_name = None,
                  llm = None,
-                 llm_async = None,
                  **kwargs):
         ''' 
         Creates an LLM-based function or wraps an external function using fn_description and outputs JSON based on output_format. 
@@ -185,7 +179,6 @@ Can also be done automatically by providing docstring with input variable names 
         self.is_compulsory = is_compulsory
         self.fn_name = fn_name
         self.llm = llm
-        self.llm_async = llm_async
         self.kwargs = kwargs
         
         self.variable_names = []
@@ -208,8 +201,87 @@ Can also be done automatically by providing docstring with input variable names 
         # make it such that we follow the same order for variable names as per the external function only if there are external function params
         if self.external_param_list != []:
             self.variable_names = [x for x in self.external_param_list if x in self.variable_names]
+             
+
+        # Append examples to description
+        if self.examples is not None:
+            self.fn_description += '\nExamples:\n' + str(examples) 
+            
+    def __str__(self):
+        ''' Prints out the function's parameters '''
+        return f'Description: {self.fn_description}\nInput: {self.variable_names}\nOutput: {self.output_format}\n'
+    
+    def get_python_representation(self):
+        """Returns a Python representation of the Function object, including the external function code if available."""
+        external_fn_code = None
+        external_fn_ref = None
+
+        if self.external_fn:
+            if inspect.isfunction(self.external_fn) and self.external_fn.__name__ == "<lambda>":
+                external_fn_ref = get_source_code_for_func(self.external_fn)
+            else:
+                external_fn_ref = self.external_fn.__name__
+                external_fn_code = get_source_code_for_func(self.external_fn)
+
+        fn_initialization = f"""Function(
+            fn_name="{self.fn_name}",
+            fn_description='''{self.fn_description}''',
+            output_format={self.output_format},
+            examples={self.examples},
+            external_fn={external_fn_ref},
+            is_compulsory={self.is_compulsory})
+        """
+        return (fn_initialization, external_fn_code)
+    
+    
+    def _prepare_function_kwargs(self, *args, **kwargs):
+         # get the shared_variables if there are any
+        shared_variables = kwargs.get('shared_variables', {})
+        # remove the mention of shared_variables in kwargs
+        if 'shared_variables' in kwargs:
+            del kwargs['shared_variables']
+        # extract out only variables listed in variable_list from kwargs
+        function_kwargs = {key: value for key, value in kwargs.items() if key in self.variable_names}
+        # additionally, if function references something in shared_variables, add that in
+        for variable in self.shared_variable_names:
+            if variable in shared_variables:
+                function_kwargs[variable] = shared_variables[variable]
+        # Do the auto-naming of variables as var1, var2, or as variable names defined in variable_names
+        for num, arg in enumerate(args):
+            if len(self.variable_names) > num:
+                function_kwargs[self.variable_names[num]] = arg
+            else:
+                function_kwargs[f'var{num+1}'] = arg
                 
-        # generate function name if not defined
+        return function_kwargs, shared_variables
+
+    def _prepare_strict_json_kwargs(self, **kwargs):
+        return {key: value for key, value in kwargs.items() if key not in self.variable_names}
+
+    def _update_shared_variables(self, results, shared_variables):
+        keys_to_delete = []
+        for key in results:
+            if key.startswith('s_'):
+                shared_variables[key] = results[key]
+                keys_to_delete.append(key)
+
+        for key in keys_to_delete:
+            del results[key]
+
+    def _generate_function_name(self):
+        if self.fn_name is None:
+            if self.external_fn is not None and hasattr(self.external_fn, '__name__') and self.external_fn.__name__ != '<lambda>':
+                self.fn_name = self.external_fn.__name__
+            else:
+                self.fn_name = 'generated_function_name'  # Replace with actual function name generation logic.
+            self.__name__ = self.fn_name
+    
+    
+            
+            
+class Function(BaseFunction):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         if self.fn_name is None:
             # if external function has a name, use it
             if self.external_fn is not None and hasattr(self.external_fn, '__name__') and self.external_fn.__name__ != '<lambda>':
@@ -222,18 +294,10 @@ Can also be done automatically by providing docstring with input variable names 
                                  llm = self.llm,
                                  **self.kwargs)
                 self.fn_name = res['Name']
-                
-        # change instance's name to function's name
+         # change instance's name to function's name
         self.__name__ = self.fn_name
-
-        # Append examples to description
-        if self.examples is not None:
-            self.fn_description += '\nExamples:\n' + str(examples)
-      
-    def __str__(self):
-        ''' Prints out the function's parameters '''
-        return f'Description: {self.fn_description}\nInput: {self.variable_names}\nOutput: {self.output_format}\n'
         
+    
     def __call__(self, *args, **kwargs):
         ''' Describes the function, and inputs the relevant parameters as either unnamed variables (args) or named variables (kwargs)
         
@@ -246,27 +310,15 @@ Can also be done automatically by providing docstring with input variable names 
         - res: Dict. JSON containing the output variables'''
         
         # get the shared_variables if there are any
-        shared_variables = kwargs.get('shared_variables', {})
-        # remove the mention of shared_variables in kwargs
-        if 'shared_variables' in kwargs:
-            del kwargs['shared_variables']
         
-        # extract out only variables listed in variable_list from kwargs
-        function_kwargs = {my_key: kwargs[my_key] for my_key in kwargs if my_key in self.variable_names}
-        # additionally, if function references something in shared_variables, add that in
-        for variable in self.shared_variable_names:
-            if variable in shared_variables:
-                function_kwargs[variable] = shared_variables[variable]
         
+        function_kwargs, shared_variables = self._prepare_function_kwargs(*args, **kwargs)
+
         # extract out only variables not listed in variable list
-        strict_json_kwargs = {my_key: kwargs[my_key] for my_key in kwargs if my_key not in self.variable_names}
-        
-        # Do the auto-naming of variables as var1, var2, or as variable names defined in variable_names
-        for num, arg in enumerate(args):
-            if len(self.variable_names) > num:
-                function_kwargs[self.variable_names[num]] = arg
-            else:
-                function_kwargs['var'+str(num+1)] = arg
+        strict_json_kwargs = {
+            my_key: kwargs[my_key] for my_key in kwargs 
+            if my_key not in self.variable_names and my_key != 'shared_variables'
+        }
                 
         # If strict_json function, do the function. 
         if self.external_fn is None:
@@ -300,18 +352,43 @@ Can also be done automatically by providing docstring with input variable names 
                         res[f'output_{i+1}'] = fn_output[i]
         
         # check if any of the output variables have a s_, which means we update the shared_variables and not output it
-        keys = list(res.keys())
-        for each in keys:
-            if each[:2] == 's_':
-                shared_variables[each] = res[each]
-                del res[each]
+        self._update_shared_variables(res, shared_variables)
                 
         if res == {}:
             res = {'Status': 'Completed'}
 
         return res
-    
-    async def async_call(self, *args, **kwargs):
+        
+        
+            
+class AsyncFunction(BaseFunction):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        ensure_awaitable(self.llm, 'llm')
+        self.__name__ = self.fn_name
+        
+    async def async_init(self): 
+        if self.fn_name is None:
+            # if external function has a name, use it
+            if self.external_fn is not None and hasattr(self.external_fn, '__name__') and self.external_fn.__name__ != '<lambda>':
+                self.fn_name = self.external_fn.__name__
+            # otherwise, generate name out
+            else:
+                res = await strict_json_async(system_prompt = "Output a function name to summarise the usage of this function.",
+                                  user_prompt = str(self.fn_description),
+                                  output_format = {"Thoughts": "What function does", "Name": "Function name with _ separating words that summarises what function does"},
+                                 llm = self.llm,
+                                 **self.kwargs)
+                self.fn_name = res['Name']
+        
+        # change instance's name to function's name
+        self.__name__ = self.fn_name
+        
+        
+        
+      
+        
+    async def __call__(self, *args, **kwargs):
         ''' Describes the function, and inputs the relevant parameters as either unnamed variables (args) or named variables (kwargs)
         
         Inputs:
@@ -323,34 +400,25 @@ Can also be done automatically by providing docstring with input variable names 
         - res: Dict. JSON containing the output variables'''
         
         # get the shared_variables if there are any
-        shared_variables = kwargs.get('shared_variables', {})
-        # remove the mention of shared_variables in kwargs
-        if 'shared_variables' in kwargs:
-            del kwargs['shared_variables']
+      
+        if self.fn_name is None:
+            await self.async_init()
         
-        # extract out only variables listed in variable_list from kwargs
-        function_kwargs = {my_key: kwargs[my_key] for my_key in kwargs if my_key in self.variable_names}
-        # additionally, if function references something in shared_variables, add that in
-        for variable in self.shared_variable_names:
-            if variable in shared_variables:
-                function_kwargs[variable] = shared_variables[variable]
-        
+        function_kwargs, shared_variables = self._prepare_function_kwargs(*args, **kwargs)
+
         # extract out only variables not listed in variable list
-        strict_json_kwargs = {my_key: kwargs[my_key] for my_key in kwargs if my_key not in self.variable_names}
-        
-        # Do the auto-naming of variables as var1, var2, or as variable names defined in variable_names
-        for num, arg in enumerate(args):
-            if len(self.variable_names) > num:
-                function_kwargs[self.variable_names[num]] = arg
-            else:
-                function_kwargs['var'+str(num+1)] = arg
+        strict_json_kwargs = {
+                    my_key: kwargs[my_key] for my_key in kwargs 
+                    if my_key not in self.variable_names and my_key != 'shared_variables'
+                }
+               
                 
         # If strict_json function, do the function. 
         if self.external_fn is None:
             res = await strict_json_async(system_prompt = self.fn_description,
                             user_prompt = function_kwargs,
                             output_format = self.output_format,
-                            llm_async = self.llm_async,
+                            llm = self.llm,
                             **self.kwargs, **strict_json_kwargs)
             
         # Else run the external function
@@ -359,9 +427,15 @@ Can also be done automatically by providing docstring with input variable names 
             # if external function uses shared_variables, pass it in
             argspec = inspect.getfullargspec(self.external_fn)
             if 'shared_variables' in argspec.args:
-                fn_output = self.external_fn(shared_variables = shared_variables, **function_kwargs)
+                if  inspect.iscoroutinefunction(self.external_fn):
+                    fn_output = await self.external_fn(shared_variables = shared_variables, **function_kwargs)
+                else: 
+                    fn_output = self.external_fn(shared_variables = shared_variables, **function_kwargs)
             else:
-                fn_output = self.external_fn(**function_kwargs)
+                if  inspect.iscoroutinefunction(self.external_fn):
+                    fn_output = await self.external_fn(**function_kwargs)
+                else:
+                    fn_output = self.external_fn(**function_kwargs)
                 
             # if there is nothing in fn_output, skip this part
             if fn_output is not None:
@@ -376,41 +450,16 @@ Can also be done automatically by providing docstring with input variable names 
                     else:
                         res[f'output_{i+1}'] = fn_output[i]
         
+         
         # check if any of the output variables have a s_, which means we update the shared_variables and not output it
-        keys = list(res.keys())
-        for each in keys:
-            if each[:2] == 's_':
-                shared_variables[each] = res[each]
-                del res[each]
+        self._update_shared_variables(res, shared_variables)
                 
         if res == {}:
             res = {'Status': 'Completed'}
 
         return res
-    
-    def get_python_representation(self):
-        """Returns a Python representation of the Function object, including the external function code if available."""
-        external_fn_code = None
-        external_fn_ref = None
 
-        if self.external_fn:
-            if inspect.isfunction(self.external_fn) and self.external_fn.__name__ == "<lambda>":
-                external_fn_ref = get_source_code_for_func(self.external_fn)
-            else:
-                external_fn_ref = self.external_fn.__name__
-                external_fn_code = get_source_code_for_func(self.external_fn)
 
-        fn_initialization = f"""Function(
-            fn_name="{self.fn_name}",
-            fn_description='''{self.fn_description}''',
-            output_format={self.output_format},
-            examples={self.examples},
-            external_fn={external_fn_ref},
-            is_compulsory={self.is_compulsory})
-        """
-        return (fn_initialization, external_fn_code)
-
-### Legacy Support
     
 # alternative name for strict_function (it is now called Function)
 strict_function = Function
