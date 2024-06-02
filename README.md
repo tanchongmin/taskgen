@@ -1,4 +1,4 @@
-# TaskGen v2.3.1
+# TaskGen v2.4.0
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 - Video (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
@@ -17,6 +17,8 @@ Noteable features include:
 - Retrieval Augmented Generation (RAG) over Function space
 - Memory to provide additional task-based prompts for task
 - Global Context for configuring your own prompts + add persistent variables
+- Async mode for Agent, Function and `strict_json` added
+- Community Uploading and Downloading of Agent and Functions
 
 I am quite sure that this is the best open-source agentic framework for task-based execution out there! 
 Existing frameworks like AutoGen rely too much on conversational text which is lengthy and not targeted.
@@ -367,9 +369,16 @@ output = my_agent.run('Calculate 2**10 * (5 + 1) / 10')
     - If you have multiple similar subtask names, then it is likely the Agent can be confused and think it has already done the subtask
     - In this case, you can disambiguate by resetting the agent and store the persistent information in `shared_variables` and provide it to the agent using `get_global_context`
     - Has the benefit of shifting the Start State closer to End State desired by resetting the Agent's planning cycle
+    
+# Async Agents, Functions, strict_json (See Tutorial 8 and 9)
+- TaskGen now supports Async functionalities
+- We use `AsyncAgent`, `AsyncFunction` and `strict_json_async`
+    - These are the async equivalents of `Agent`, `Function` and `strict_json`
+
 
 # Known Limitations
-- To be added
+- `gpt-3.5-turbo` is not that great with mathematical functions for Agents. Use `gpt-4-turbo` or better for more consistent results
+- `gpt-3.5-turbo` is not that great with Memory (Tutorial 4). Use `gpt-4-turbo` or better for more consistent results
 
 # Contributing to the project
 
@@ -388,7 +397,7 @@ output = my_agent.run('Calculate 2**10 * (5 + 1) / 10')
 5. Submit a pull request
 
 # What are we looking out for?
-1. Integrations with functions - It would be good if we could import function definitions from elsewhere, e.g. LangChain, into the format shown here. It might even be done automatically using LLM-based conversion using StrictJSON!
+1. Contributing example Agents and Functions. Agents can now be contributed easily using `agent.contribute_agent()` and the entire Agent code with all the functions and memory will be converted to text-based code and put on the TaskGen GitHub. Do share your use cases actively so that other people can benefit :) These Agents can be downloaded by others via `agent.load_community_agent(agent_name)`
 2. Jupyter Notebooks showcasing what could be done with the framework for something useful. Let your imagination guide you, we look forward to see what you create
 3. Other Known Limitations - Do test the framework out extensively and note its failure cases. We will see if we can address them, if not we will put them in Known Limitations.
 4. (For the prompt engineer). If you could find a better way to make the prompts work, let us know directly - we do need to test this out across all Tutorial Jupyter Notebooks to make sure that it really works with existing datasets. Also, if you are using other LLMs beside OpenAI, and find the prompts do not work as well - try to rejig your own prompts and let us know as well!

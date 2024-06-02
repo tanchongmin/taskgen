@@ -1,3 +1,13 @@
+2 Jun 2024 (v2.4.0)
+- Added Async Support for `Agent`, `Function` and `strict_json` (credit to Prince Saroj)
+- New Async Classes: AsyncAgent, AsyncFunction, AsyncMemory, AsyncRanker
+- New Async function: strict_json_async
+- New Support: support for async external functions
+- Added Tutorials 8 and 9 to show how to use TaskGen in Async mode
+- Added `contribute_agent` and `load_community_agent` (credit to Hardik) so as to easily contribute an Agent in code form, and download a community agent by {{agent_class_name}}. Community agents will be in the path https://github.com/simbianai/taskgen/contrib/community/{{agent_class_name}}
+- Added aliases `use_tool` for `use_function`, `list_tools` for `list_functions`, `print_tools` for `print_functions`, `assign_tools` for `assign_functions`, `remove_tool` for `remove_function`
+- Added a smart check for `assign_functions` to see if you are assigning an Agent. If so, we will automatically call `assign_agents` for you
+
 24 May 2024 (v2.3.1)
 - Hierarchical Agents:
     - Inner agents will no longer be able to modify meta agent's subtasks
