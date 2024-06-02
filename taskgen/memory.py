@@ -53,7 +53,7 @@ class BaseMemory:
 
     def get_python_representation(self, include_memory_elements) -> str:
         ''' Returns a string representation of the object for debugging '''
-        return f"Memory(memory={self.memory if include_memory_elements else []}, top_k={self.top_k}, mapper={self.mapper}, approach='{self.approach}', ranker={self.ranker if hasattr(self.ranker, 'get_python_representation') else 'Ranker'})"
+        return f"Memory(memory={self.memory if include_memory_elements else []}, top_k={self.top_k}, mapper={get_source_code_for_func(self.mapper)}, approach='{self.approach}', ranker={self.ranker.get_python_representation() if hasattr(self.ranker, 'get_python_representation') else 'None'})"
 
 class Memory(BaseMemory):
     
