@@ -1,9 +1,4 @@
 import asyncio
-import PyPDF2
-from docx import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-import pandas as pd
 from taskgen import strict_json
 from taskgen.base_async import strict_json_async
 
@@ -25,9 +20,7 @@ class BaseMemory:
             - Can be replaced with a function which returns similarity score from 0 to 1 when given a query and key
      '''
     
-    def __init__(self, memory: list = None, top_k: int = 3, mapper=lambda x: x, approach='retrieve_by_ranker', llm=None, retrieve_fn=None, ranker=None):
-        if memory is None:
-            memory = []  # Initialize a new list if no list is provided
+    def __init__(self, memory: list = [], top_k: int = 3, mapper=lambda x: x, approach='retrieve_by_ranker', llm=None, retrieve_fn=None, ranker=None):
         self.memory = memory
         self.top_k = top_k
         self.mapper = mapper
@@ -39,31 +32,6 @@ class BaseMemory:
     def append(self, new_memory):
         ''' Adds a new_memory '''
         self.memory.append(new_memory)
-        
-    def add_file(self, filepath, text_splitter= None):
-        if '.xls' in filepath:
-            text = pd.read_excel(filepath).to_string()
-        elif '.csv' in filepath:
-            text = pd.read_csv(filepath).to_string()
-        elif '.docx' in filepath:
-            text = self.read_docx(filepath)
-        elif '.pdf' in filepath:
-            text = self.read_pdf(filepath)
-        else:
-            raise ValueError("File type not spported, supported file types: pdf, docx, csv, xls")
-        if not text_splitter:
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=500,
-                chunk_overlap=100,
-                length_function=len,
-                is_separator_regex=False,
-                separators = [".\n", "\n"]
-            )
-        
-        texts = text_splitter.split_text(text)
-        self.memory.extend(texts)
-        
-        
         
     def extend(self, memory_list: list):
         ''' Adds a list of memories '''
@@ -78,27 +46,6 @@ class BaseMemory:
     def reset(self):
         ''' Clears all memory '''
         self.memory = []
-        
-        
-    def read_pdf(self, filepath):
-        # Open the PDF file
-        text_list = []
-        with open(filepath, "rb") as file:
-            pdf_reader = PyPDF2.PdfReader(file)
-            for page in pdf_reader.pages:
-                page_text = page.extract_text()
-                if page_text:  # Ensure there's text on the page
-                    text_list.append(page_text)
-                else:
-                    print("No text found on page")
-        return '\n'.join(text_list)
-    
-    def read_docx(self, filepath):
-        doc = Document(filepath)
-        text_list = []
-        for para in doc.paragraphs:
-            text_list.append(para.text)
-        return '\n'.join(text_list)
         
     def isempty(self) -> bool:
         ''' Returns whether or not the memory is empty '''
