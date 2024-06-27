@@ -1,3 +1,7 @@
+28 Jun 2024 (v2.4.1)
+- Added `code_action` as an input variable for Agent, which when set to True, will by default use the `python_generate_and_run_code_tool` function all the time except for end_task (which you need to equip to the Agent yourself externally)
+- Fixed some minor issues for `contribute_agent` code
+
 2 Jun 2024 (v2.4.0)
 - Added Async Support for `Agent`, `Function` and `strict_json` (credit to Prince Saroj)
 - New Async Classes: AsyncAgent, AsyncFunction, AsyncMemory, AsyncRanker
