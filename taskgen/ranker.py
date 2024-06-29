@@ -1,6 +1,5 @@
 import inspect
 import numpy as np
-from openai import AsyncOpenAI, OpenAI
 
 from taskgen.utils import ensure_awaitable
 
@@ -23,6 +22,8 @@ class Ranker(BaseRanker):
     def __call__(self, query, key) -> float:
         query, key = str(query), str(key)
         if self.ranking_fn is None:
+
+            from openai import OpenAI
             client = OpenAI()
             query_embedding = self.get_or_create_embedding(query, client)
             key_embedding = self.get_or_create_embedding(key, client)
@@ -44,6 +45,8 @@ class AsyncRanker(BaseRanker):
     async def __call__(self, query, key) -> float:
         query, key = str(query), str(key)
         if self.ranking_fn is None:
+
+            from openai import AsyncOpenAI
             client = AsyncOpenAI()
             query_embedding = await self.get_or_create_embedding_async(query, client)
             key_embedding = await self.get_or_create_embedding_async(key, client)
