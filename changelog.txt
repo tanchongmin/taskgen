@@ -1,6 +1,7 @@
 1 Jul 2024 (v2.5.0)
+- Added `ConversableAgent` class in `conversation.py`
 - For Agent's query() function, changed it to using user_prompt instead of system_prompt, as it caused ChatGPT some issues in identifying the user input when user_prompt was blank
-- Changed Updated Subtask to Actual Subtask in get_next_subtask in agent.py
+- Changed Updated Subtask to Actual Subtask in get_next_subtask in agent.py, for robustness
 - Changed `contribute_agent` code to be done without the need for git clone (Credit: Hardik)
 - Only import OpenAI when necessary in ranker.py, base.py, base_async.py (Credit: JiangZhuo)
 
