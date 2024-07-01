@@ -1,5 +1,5 @@
 import asyncio
-from taskgen import strict_json
+from taskgen.base import strict_json
 from taskgen.base_async import strict_json_async
 
 from taskgen.ranker import AsyncRanker, Ranker

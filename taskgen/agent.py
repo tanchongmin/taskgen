@@ -8,8 +8,9 @@ import subprocess
 import sys
 
 from termcolor import colored
-from taskgen import Function, strict_json
 import requests
+from taskgen.base import strict_json
+from taskgen.function import Function
 from taskgen.base_async import strict_json_async
 from taskgen.function import AsyncFunction
 from taskgen.memory import AsyncMemory, Memory
@@ -453,8 +454,8 @@ You are only given the Assigned Task from User with no further inputs. Do not do
                     
             else:    
                 res2 = self.query(query = f'''{background_info}{rag_info}\n\nThoughts: {res["Thoughts"]}\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for {matches} to fulfil Current Subtask.
-Write an Updated Subtask stating the actual input values according to what is actually done for the Equipped Function.
-Make sure the Updated Subtask is detailed and can be interpreted without reference to any context.''',
+Write an Actual Subtask stating the actual input values according to what is actually done for the Equipped Function.
+Make sure the Actual Subtask is detailed and can be interpreted without reference to any context.''',
                              output_format = input_format,
                              provide_function_list = False)
                 
@@ -1160,8 +1161,8 @@ You are only given the Assigned Task from User with no further inputs. Do not do
                     
             else:    
                 res2 = await self.query(query = f'''{background_info}{rag_info}\n\nThoughts: {res["Thoughts"]}\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for {matches} to fulfil Current Subtask.
-Write an Updated Subtask stating the actual input values according to what is actually done for the Equipped Function.
-Make sure the Updated Subtask is detailed and can be interpreted without reference to any context.''',
+Write an Actual Subtask stating the actual input values according to what is actually done for the Equipped Function.
+Make sure the Actual Subtask is detailed and can be interpreted without reference to any context.''',
                              output_format = input_format,
                              provide_function_list = False)
                 
