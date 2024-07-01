@@ -1,6 +1,6 @@
 2 Jul 2024 (v2.5.1)
-- Added auto-chunking for memory with pdf, csv, excel, docx files using `add_file` method in Memory class
-- Updated Tutorial 4 to use docstring for external functions, and to showcase auto-chunking in memory
+- Added auto-chunking for memory with pdf, csv, excel, docx files using `add_file` method in Memory class (Credit: Prince Saroj)
+- Updated Tutorial 4 to use docstring for external functions, and to showcase auto-chunking in memory (Credit: Prince Saroj)
 - Added in llm from agent to Memory as default, so that Memory retrieve_by_llm could be done via the same llm as the agent
 - Added in dependencies: langchain, PyPDF2, python-docx, pandas, xlrd
 
