@@ -269,14 +269,14 @@ class Agent(BaseAgent):
         if global_context_string != '' or global_context_output != '':
             global_context = 'Global Context:\n```\n' + global_context_string + '\n' + global_context_output + '```\n'
         
-        system_prompt = f'''You are an agent named {self.agent_name} with the following description: ```{self.agent_description}```\n'''
+        user_prompt = f'''You are an agent named {self.agent_name} with the following description: ```{self.agent_description}```\n'''
         if provide_function_list:
-            system_prompt += f"You have the following Equipped Functions available:\n```{self.list_functions(filtered_fn_list)}```\n"
-        system_prompt += global_context
-        system_prompt += query
+            user_prompt += f"You have the following Equipped Functions available:\n```{self.list_functions(filtered_fn_list)}```\n"
+        user_prompt += global_context
+        user_prompt += query
         
-        res = strict_json(system_prompt = system_prompt,
-        user_prompt = '',
+        res = strict_json(system_prompt = '',
+        user_prompt = user_prompt,
         output_format = output_format, 
         verbose = self.debug,
         llm = self.llm,
@@ -975,14 +975,14 @@ class AsyncAgent(BaseAgent):
         if global_context_string != '' or global_context_output != '':
             global_context = 'Global Context:\n```\n' + global_context_string + '\n' + global_context_output + '```\n'
         
-        system_prompt = f'''You are an agent named {self.agent_name} with the following description: ```{self.agent_description}```\n'''
+        user_prompt = f'''You are an agent named {self.agent_name} with the following description: ```{self.agent_description}```\n'''
         if provide_function_list:
-            system_prompt += f"You have the following Equipped Functions available:\n```{self.list_functions(filtered_fn_list)}```\n"
-        system_prompt += global_context
-        system_prompt += query
+            user_prompt += f"You have the following Equipped Functions available:\n```{self.list_functions(filtered_fn_list)}```\n"
+        user_prompt += global_context
+        user_prompt += query
         
-        res = await strict_json_async(system_prompt = system_prompt,
-        user_prompt = '',
+        res = await strict_json_async(system_prompt = '',
+        user_prompt = user_prompt,
         output_format = output_format, 
         verbose = self.debug,
         llm = self.llm,
