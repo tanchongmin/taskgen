@@ -2,7 +2,6 @@ import json
 import re
 import ast
 from typing import Tuple
-from openai import OpenAI
 
 
 ### Helper Functions ###
@@ -349,7 +348,7 @@ def wrap_with_angle_brackets(d: dict, delimiter: str, delimiter_num: int) -> dic
         return d
     
 def chat(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5-turbo', temperature: float = 0, verbose: bool = False, host: str = 'openai', llm = None, **kwargs):
-    '''Performs a chat with the host's LLM model with system prompt, user prompt, model, verbose and kwargs
+    r"""Performs a chat with the host's LLM model with system prompt, user prompt, model, verbose and kwargs
     Returns the output string res
     - system_prompt: String. Write in whatever you want the LLM to become. e.g. "You are a \<purpose in life\>"
     - user_prompt: String. The user input. Later, when we use it as a function, this is the function input
@@ -363,7 +362,7 @@ def chat(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5-turbo', tem
         - Output:
             - res: String. The response of the LLM call
     - **kwargs: Dict. Additional arguments for LLM chat
-    '''
+    """
     if llm is not None:
         ''' If you specified your own LLM, then we just feed in the system and user prompt 
         LLM function should take in system prompt (str) and user prompt (str), and output a response (str) '''
@@ -378,7 +377,8 @@ def chat(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5-turbo', tem
                 assert(model in ['gpt-4-1106-preview', 'gpt-3.5-turbo-1106'])
             except Exception as e:
                 model = 'gpt-3.5-turbo-1106'
-                
+
+        from openai import OpenAI
         client = OpenAI()
         response = client.chat.completions.create(
             model=model,
@@ -401,7 +401,7 @@ def chat(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5-turbo', tem
 
 ### Main Functions ###
 def strict_json(system_prompt: str, user_prompt: str, output_format: dict, return_as_json = False, custom_checks: dict = None, check_data = None, delimiter: str = '###', num_tries: int = 3, openai_json_mode: bool = False, **kwargs):
-    ''' Ensures that OpenAI will always adhere to the desired output JSON format defined in output_format. 
+    r""" Ensures that OpenAI will always adhere to the desired output JSON format defined in output_format.
     Uses rule-based iterative feedback to ask GPT to self-correct.
     Keeps trying up to num_tries it it does not. Returns empty JSON if unable to after num_tries iterations.
     
@@ -421,7 +421,7 @@ def strict_json(system_prompt: str, user_prompt: str, output_format: dict, retur
     
     Output:
     - res: Dict. The JSON output of the model. Returns {} if JSON parsing failed.
-    '''
+    """
     # default initialise custom_checks to {}
     if custom_checks is None:
         custom_checks = {}
