@@ -1,3 +1,9 @@
+2 Jul 2024 (v2.5.1)
+- Added auto-chunking for memory with pdf, csv, excel, docx files using `add_file` method in Memory class
+- Updated Tutorial 4 to use docstring for external functions, and to showcase auto-chunking in memory
+- Added in llm from agent to Memory as default, so that Memory retrieve_by_llm could be done via the same llm as the agent
+- Added in dependencies: langchain, PyPDF2, python-docx, pandas, xlrd
+
 1 Jul 2024 (v2.5.0)
 - Added `ConversableAgent` class in `conversation.py`
 - For Agent's query() function, changed it to using user_prompt instead of system_prompt, as it caused ChatGPT some issues in identifying the user input when user_prompt was blank

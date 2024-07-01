@@ -1,4 +1,9 @@
 import asyncio
+import PyPDF2
+from docx import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+import pandas as pd
 from taskgen.base import strict_json
 from taskgen.base_async import strict_json_async
 
@@ -32,6 +37,49 @@ class BaseMemory:
     def append(self, new_memory):
         ''' Adds a new_memory '''
         self.memory.append(new_memory)
+
+    def add_file(self, filepath, text_splitter= None):
+        if '.xls' in filepath:
+            text = pd.read_excel(filepath).to_string()
+        elif '.csv' in filepath:
+            text = pd.read_csv(filepath).to_string()
+        elif '.docx' in filepath:
+            text = self.read_docx(filepath)
+        elif '.pdf' in filepath:
+            text = self.read_pdf(filepath)
+        else:
+            raise ValueError("File type not spported, supported file types: pdf, docx, csv, xls")
+        if not text_splitter:
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=500,
+                chunk_overlap=100,
+                length_function=len,
+                is_separator_regex=False,
+                separators = [".\n", "\n"]
+            )
+
+        texts = text_splitter.split_text(text)
+        self.memory.extend(texts)
+
+    def read_pdf(self, filepath):
+        # Open the PDF file
+        text_list = []
+        with open(filepath, "rb") as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            for page in pdf_reader.pages:
+                page_text = page.extract_text()
+                if page_text:  # Ensure there's text on the page
+                    text_list.append(page_text)
+                else:
+                    print("No text found on page")
+        return '\n'.join(text_list)
+
+    def read_docx(self, filepath):
+        doc = Document(filepath)
+        text_list = []
+        for para in doc.paragraphs:
+            text_list.append(para.text)
+        return '\n'.join(text_list)
         
     def extend(self, memory_list: list):
         ''' Adds a list of memories '''
@@ -101,8 +149,8 @@ class Memory(BaseMemory):
         top_k_indices = res[f'top_{self.top_k}_list']
         return [self.memory[index] for index in top_k_indices]
 
-
-
+    
+    
 class AsyncMemory(BaseMemory):
     ''' Retrieves top k memory items based on task 
     - Inputs:

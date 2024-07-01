@@ -220,7 +220,7 @@ class BaseAgent:
 class Agent(BaseAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.default_memory = Memory(top_k = 5, mapper = lambda x: x.fn_name + ': ' + x.fn_description, approach = 'retrieve_by_ranker')
+        self.default_memory = Memory(top_k = 5, mapper = lambda x: x.fn_name + ': ' + x.fn_description, approach = 'retrieve_by_ranker', llm = self.llm)
         if self.memory_bank is None:
             self.memory_bank = {'Function': self.default_memory}
             self.memory_bank['Function'].reset()
@@ -926,7 +926,8 @@ class AsyncAgent(BaseAgent):
         self.default_memory = AsyncMemory(
             top_k=5, 
             mapper=lambda x: (x.fn_name or '') + ': ' + (x.fn_description or ''), 
-            approach='retrieve_by_ranker'
+            approach='retrieve_by_ranker',
+            llm = self.llm
         )
         if self.memory_bank is None:
             self.memory_bank = {'Function': self.default_memory}
