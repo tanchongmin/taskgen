@@ -1,6 +1,7 @@
 1 Jul 2024 (v2.5.0)
 - For Agent's query() function, changed it to using user_prompt instead of system_prompt, as it caused ChatGPT some issues in identifying the user input when user_prompt was blank
-- Changed `contribute_agent` code to be done without the need for git clone
+- Changed `contribute_agent` code to be done without the need for git clone (Credit: Hard)
+- Only import OpenAI when necessary in ranker.py, base.py, base_async.py (Credit: JiangZhuo)
 
 28 Jun 2024 (v2.4.1)
 - Added `code_action` as an input variable for Agent, which when set to True, will by default use the `python_generate_and_run_code_tool` function all the time except for end_task (which you need to equip to the Agent yourself externally)
