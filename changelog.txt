@@ -1,3 +1,10 @@
+3 Jul 2024 (v3.0.0)
+- Edited the `strict_json` and `strict_json_async` prompt to list out all the json output keys, so that the LLM will be more grounded
+- Edited the `convert_to_dict` function in `base.py` to make it more robust to variations of incorrect keys, edited error message for incorrect key to make it more robust
+- Changed the `conversation.py` Conversable Class to make it output Action Done in text format (instead of Subtasks Completed), which could be understood by LLMs in a better way
+- Ensured the examples in Tutorial 7 would work for ChatGPT, Claude Haiku and Llama3 70B
+- Despite repeated attempts to ensure compatibility for Llama3 8B, the json generating abilities are not good enough for TaskGen purposes
+
 2 Jul 2024 (v2.6.0)
 - Removed Actual Subtasks in get_next_subtasks() of Agent and AsyncAgent. It was interferring with getting the functions for Function Calling.
 

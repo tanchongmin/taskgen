@@ -286,8 +286,9 @@ async def strict_json_async(system_prompt: str, user_prompt: str, output_format:
         # wrap the values with angle brackets and wrap keys with delimiter to encourage LLM to modify it
         new_output_format = wrap_with_angle_brackets(output_format, delimiter, 1)
         
-        output_format_prompt = f'''\nOutput in the following json string format: {new_output_format}
-Update text enclosed in <>. Output only a valid json string beginning with {{ and ending with }}'''
+        output_format_prompt = f'''\nOutput using the following json template: {new_output_format}
+Update values enclosed in <> and remove the <>. 
+Output only a valid json beginning with {{ and ending with }} and ensure that the following keys are present: {list(new_output_format.keys())}'''
 
         for i in range(num_tries):
             my_system_prompt = str(system_prompt) + output_format_prompt + error_msg
@@ -297,10 +298,16 @@ Update text enclosed in <>. Output only a valid json string beginning with {{ an
             res = await chat_async(my_system_prompt, my_user_prompt, **kwargs)
             
             # extract only the chunk including the opening and closing braces
+            # generate the { or } if LLM has forgotten to do so
             startindex = res.find('{')
+            if startindex == -1:
+                startindex = 0
+                res = '{' + res
             endindex = res.rfind('}')
-            res = res[startindex: endindex+1]
-
+            if endindex == -1:
+                res = res + '}'
+                endindex = len(res) - 1
+                
             # try-catch block to ensure output format is adhered to
             try:
                 # check that res is a json string

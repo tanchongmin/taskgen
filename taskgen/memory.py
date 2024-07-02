@@ -14,7 +14,7 @@ from taskgen.utils import ensure_awaitable, get_source_code_for_func, top_k_inde
 class BaseMemory:
     ''' Retrieves top k memory items based on task 
     - Inputs:
-        - `memory`: List. Default: Empty List. The list containing the memory items
+        - `memory`: List. Default: None. The list containing the memory items
         - `top_k`: Int. Default: 3. The number of memory list items to retrieve
         - `mapper`: Function. Maps the memory item to another form for comparison by ranker or LLM. Default: `lambda x: x`
             - Example mapping: `lambda x: x.fn_description` (If x is a Class and the string you want to compare for similarity is the fn_description attribute of that class)
@@ -25,8 +25,11 @@ class BaseMemory:
             - Can be replaced with a function which returns similarity score from 0 to 1 when given a query and key
      '''
     
-    def __init__(self, memory: list = [], top_k: int = 3, mapper=lambda x: x, approach='retrieve_by_ranker', llm=None, retrieve_fn=None, ranker=None):
-        self.memory = memory
+    def __init__(self, memory: list = None, top_k: int = 3, mapper=lambda x: x, approach='retrieve_by_ranker', llm=None, retrieve_fn=None, ranker=None):
+        if memory is None:
+            self.memory = []
+        else:
+            self.memory = memory
         self.top_k = top_k
         self.mapper = mapper
         self.approach = approach

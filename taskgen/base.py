@@ -25,16 +25,37 @@ def convert_to_dict(field: str, keys: dict, delimiter: str) -> dict:
         # if output field missing, raise an error
         if f"'{delimiter}{key}{delimiter}':" not in field and f'"{delimiter}{key}{delimiter}":' not in field: 
             # try to fix it if possible
+            ## Cases with no delimiter but with key and/or incomplete quotations
             if field.count(f"'{key}':") == 1:
                 field = field.replace(f"'{key}':", f"'{delimiter}{key}{delimiter}':")
-            elif field.count(f'"{key}"') == 1:
+            elif field.count(f"'{key}:") == 1:
+                field = field.replace(f"'{key}:", f"'{delimiter}{key}{delimiter}':")
+            elif field.count(f"{key}':") == 1:
+                field = field.replace(f"{key}':", f"'{delimiter}{key}{delimiter}':")
+            elif field.count(f'"{key}":') == 1:
                 field = field.replace(f'"{key}":', f'"{delimiter}{key}{delimiter}":')
+            elif field.count(f'"{key}:') == 1:
+                field = field.replace(f'"{key}:', f'"{delimiter}{key}{delimiter}":')
+            elif field.count(f'{key}":') == 1:
+                field = field.replace(f'{key}":', f'"{delimiter}{key}{delimiter}":')
+                
+            ## Cases with delimiter but with incomplete quotations
+            elif field.count(f'{delimiter}{key}{delimiter}:') == 1:
+                field = field.replace(f'{delimiter}{key}{delimiter}:', f'"{delimiter}{key}{delimiter}":')
+            elif field.count(f'"{delimiter}{key}{delimiter}:') == 1:
+                field = field.replace(f'"{delimiter}{key}{delimiter}:', f'"{delimiter}{key}{delimiter}":')
+            elif field.count(f'{delimiter}{key}{delimiter}":') == 1:
+                field = field.replace(f'{delimiter}{key}{delimiter}":', f'"{delimiter}{key}{delimiter}":')
+            elif field.count(f"'{delimiter}{key}{delimiter}:") == 1:
+                field = field.replace(f"'{delimiter}{key}{delimiter}:", f"'{delimiter}{key}{delimiter}':")
+            elif field.count(f"{delimiter}{key}{delimiter}':") == 1:
+                field = field.replace(f"{delimiter}{key}{delimiter}':", f"'{delimiter}{key}{delimiter}':")
             else:
-                raise Exception(f'''"{key}" not in json string output. You must use \"{delimiter}{{key}}{delimiter}\" to enclose the {{key}}.''')
-
+                raise Exception(f'''The key "{delimiter}{key}{delimiter}" is not present in json output. Ensure that you include this key in the json output.''')
+                
     # if all is good, we then extract out the fields
     # Use regular expressions to extract keys and values
-    pattern = fr",*\s*['|\"]{delimiter}([^#]*){delimiter}['|\"]: "
+    pattern = fr",*\s*['|\"]{delimiter}([^#]*){delimiter}['|\"]:\s*"
 
     matches = re.split(pattern, str(field[1:-1]).strip())
 
@@ -460,8 +481,9 @@ def strict_json(system_prompt: str, user_prompt: str, output_format: dict, retur
         # wrap the values with angle brackets and wrap keys with delimiter to encourage LLM to modify it
         new_output_format = wrap_with_angle_brackets(output_format, delimiter, 1)
         
-        output_format_prompt = f'''\nOutput in the following json string format: {new_output_format}
-Update text enclosed in <>. Output only a valid json string beginning with {{ and ending with }}'''
+        output_format_prompt = f'''\nOutput using the following json template: {new_output_format}
+Update values enclosed in <> and remove the <>. 
+Output only a valid json beginning with {{ and ending with }} and ensure that the following keys are present: {list(new_output_format.keys())}'''
 
         for i in range(num_tries):
             my_system_prompt = str(system_prompt) + output_format_prompt + error_msg
@@ -471,8 +493,16 @@ Update text enclosed in <>. Output only a valid json string beginning with {{ an
             res = chat(my_system_prompt, my_user_prompt, **kwargs)
             
             # extract only the chunk including the opening and closing braces
+            # generate the { or } if LLM has forgotten to do so
             startindex = res.find('{')
+            if startindex == -1:
+                startindex = 0
+                res = '{' + res
             endindex = res.rfind('}')
+            if endindex == -1:
+                res = res + '}'
+                endindex = len(res) - 1
+            
             res = res[startindex: endindex+1]
 
             # try-catch block to ensure output format is adhered to
