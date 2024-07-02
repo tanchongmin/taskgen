@@ -1,3 +1,6 @@
+2 Jul 2024 (v2.6.0)
+- Removed Actual Subtasks in get_next_subtasks() of Agent and AsyncAgent. It was interferring with getting the functions for Function Calling.
+
 2 Jul 2024 (v2.5.1)
 - Added auto-chunking for memory with pdf, csv, excel, docx files using `add_file` method in Memory class (Credit: Prince Saroj)
 - Updated Tutorial 4 to use docstring for external functions, and to showcase auto-chunking in memory (Credit: Prince Saroj)
