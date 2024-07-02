@@ -445,25 +445,17 @@ You are only given the Assigned Task from User with no further inputs. Do not do
                     input_format[first_part] = f'A suitable value, type: {second_part}'
                 else:
                     input_format[match] = 'A suitable value'
-            
-            input_format["Actual Subtask"] = "Edit Current Subtask to suit actual function call"
                     
             # if there is no input, then do not need LLM to extract out function's input
             if input_format == {}:
                 res["Equipped Function Inputs"] = {}
                     
             else:    
-                res2 = self.query(query = f'''{background_info}{rag_info}\n\nThoughts: {res["Thoughts"]}\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for {matches} to fulfil Current Subtask.
-Write an Actual Subtask stating the actual input values according to what is actually done for the Equipped Function.
-Make sure the Actual Subtask is detailed and can be interpreted without reference to any context.''',
+                res2 = self.query(query = f'''{background_info}{rag_info}\n\nThoughts: {res["Thoughts"]}\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for {matches} to fulfil Current Subtask''',
                              output_format = input_format,
                              provide_function_list = False)
                 
-                # Rephrase the Current Subtask to suit what is actually done
-                res["Current Subtask"] = res2["Actual Subtask"]
-                
                 # store the rest of the function parameters
-                del res2["Actual Subtask"]
                 res["Equipped Function Inputs"] = res2
             
         return res["Current Subtask"], res["Equipped Function"], res["Equipped Function Inputs"]
@@ -1153,25 +1145,17 @@ You are only given the Assigned Task from User with no further inputs. Do not do
                     input_format[first_part] = f'A suitable value, type: {second_part}'
                 else:
                     input_format[match] = 'A suitable value'
-            
-            input_format["Actual Subtask"] = "Edit Current Subtask to suit actual function call"
                     
             # if there is no input, then do not need LLM to extract out function's input
             if input_format == {}:
                 res["Equipped Function Inputs"] = {}
                     
             else:    
-                res2 = await self.query(query = f'''{background_info}{rag_info}\n\nThoughts: {res["Thoughts"]}\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for {matches} to fulfil Current Subtask.
-Write an Actual Subtask stating the actual input values according to what is actually done for the Equipped Function.
-Make sure the Actual Subtask is detailed and can be interpreted without reference to any context.''',
+                res2 = await self.query(query = f'''{background_info}{rag_info}\n\nThoughts: {res["Thoughts"]}\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for {matches} to fulfil Current Subtask''',
                              output_format = input_format,
                              provide_function_list = False)
                 
-                # Rephrase the Current Subtask to suit what is actually done
-                res["Current Subtask"] = res2["Actual Subtask"]
-                
                 # store the rest of the function parameters
-                del res2["Actual Subtask"]
                 res["Equipped Function Inputs"] = res2
             
         return res["Current Subtask"], res["Equipped Function"], res["Equipped Function Inputs"]
