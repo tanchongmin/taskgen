@@ -3,6 +3,7 @@ import math
 
 
 # Author: @tanchongmin
+# Author Comments: This agent should be used for any addition-based calculation
 class MathExpert(Agent):
     def __init__(self):
         var_add = Function(
