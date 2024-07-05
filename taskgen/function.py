@@ -1,7 +1,8 @@
 import re
 import inspect
 from typing import get_type_hints
-from taskgen import strict_json
+
+from taskgen.base import strict_json
 from taskgen.base_async import strict_json_async
 
 from taskgen.utils import ensure_awaitable, get_source_code_for_func

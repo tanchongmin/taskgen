@@ -3,7 +3,6 @@ import json
 import re
 import ast
 from typing import Tuple
-from openai import AsyncOpenAI
 from taskgen.base import convert_to_dict, parse_response_llm_check, remove_unicode_escape, type_check_and_convert, wrap_with_angle_brackets
 
 from taskgen.utils import ensure_awaitable
@@ -171,7 +170,7 @@ async def check_key_async(field: str, output_format, new_output_format, delimite
 
 
 async def chat_async(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5-turbo', temperature: float = 0, verbose: bool = False, host: str = 'openai', llm= None, **kwargs):
-    '''Performs a chat with the host's LLM model with system prompt, user prompt, model, verbose and kwargs
+    r"""Performs a chat with the host's LLM model with system prompt, user prompt, model, verbose and kwargs
     Returns the output string res
     - system_prompt: String. Write in whatever you want the LLM to become. e.g. "You are a \<purpose in life\>"
     - user_prompt: String. The user input. Later, when we use it as a function, this is the function input
@@ -185,7 +184,7 @@ async def chat_async(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5
         - Output:
             - res: String. The response of the LLM call
     - **kwargs: Dict. Additional arguments for LLM chat
-    '''
+    """
     if llm is not None:
         ensure_awaitable(llm, 'llm')
         ''' If you specified your own LLM, then we just feed in the system and user prompt 
@@ -201,7 +200,8 @@ async def chat_async(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5
                 assert(model in ['gpt-4-1106-preview', 'gpt-3.5-turbo-1106'])
             except Exception as e:
                 model = 'gpt-3.5-turbo-1106'
-                
+
+        from openai import AsyncOpenAI
         client = AsyncOpenAI()
         response = await client.chat.completions.create(
             model=model,
@@ -227,7 +227,7 @@ async def chat_async(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5
     
     
 async def strict_json_async(system_prompt: str, user_prompt: str, output_format: dict, return_as_json = False, custom_checks: dict = None, check_data = None, delimiter: str = '###', num_tries: int = 3, openai_json_mode: bool = False, **kwargs):
-    ''' Ensures that OpenAI will always adhere to the desired output JSON format defined in output_format. 
+    r""" Ensures that OpenAI will always adhere to the desired output JSON format defined in output_format.
     Uses rule-based iterative feedback to ask GPT to self-correct.
     Keeps trying up to num_tries it it does not. Returns empty JSON if unable to after num_tries iterations.
     
@@ -247,7 +247,7 @@ async def strict_json_async(system_prompt: str, user_prompt: str, output_format:
     
     Output:
     - res: Dict. The JSON output of the model. Returns {} if JSON parsing failed.
-    '''
+    """
     # default initialise custom_checks to {}
     if custom_checks is None:
         custom_checks = {}
@@ -286,8 +286,9 @@ async def strict_json_async(system_prompt: str, user_prompt: str, output_format:
         # wrap the values with angle brackets and wrap keys with delimiter to encourage LLM to modify it
         new_output_format = wrap_with_angle_brackets(output_format, delimiter, 1)
         
-        output_format_prompt = f'''\nOutput in the following json string format: {new_output_format}
-Update text enclosed in <>. Output only a valid json string beginning with {{ and ending with }}'''
+        output_format_prompt = f'''\nOutput using the following json template: {new_output_format}
+Update values enclosed in <> and remove the <>. 
+Output only a valid json beginning with {{ and ending with }} and ensure that the following keys are present: {list(new_output_format.keys())}'''
 
         for i in range(num_tries):
             my_system_prompt = str(system_prompt) + output_format_prompt + error_msg
@@ -297,10 +298,16 @@ Update text enclosed in <>. Output only a valid json string beginning with {{ an
             res = await chat_async(my_system_prompt, my_user_prompt, **kwargs)
             
             # extract only the chunk including the opening and closing braces
+            # generate the { or } if LLM has forgotten to do so
             startindex = res.find('{')
+            if startindex == -1:
+                startindex = 0
+                res = '{' + res
             endindex = res.rfind('}')
-            res = res[startindex: endindex+1]
-
+            if endindex == -1:
+                res = res + '}'
+                endindex = len(res) - 1
+                
             # try-catch block to ensure output format is adhered to
             try:
                 # check that res is a json string

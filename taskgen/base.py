@@ -2,7 +2,6 @@ import json
 import re
 import ast
 from typing import Tuple
-from openai import OpenAI
 
 
 ### Helper Functions ###
@@ -26,16 +25,37 @@ def convert_to_dict(field: str, keys: dict, delimiter: str) -> dict:
         # if output field missing, raise an error
         if f"'{delimiter}{key}{delimiter}':" not in field and f'"{delimiter}{key}{delimiter}":' not in field: 
             # try to fix it if possible
+            ## Cases with no delimiter but with key and/or incomplete quotations
             if field.count(f"'{key}':") == 1:
                 field = field.replace(f"'{key}':", f"'{delimiter}{key}{delimiter}':")
-            elif field.count(f'"{key}"') == 1:
+            elif field.count(f"'{key}:") == 1:
+                field = field.replace(f"'{key}:", f"'{delimiter}{key}{delimiter}':")
+            elif field.count(f"{key}':") == 1:
+                field = field.replace(f"{key}':", f"'{delimiter}{key}{delimiter}':")
+            elif field.count(f'"{key}":') == 1:
                 field = field.replace(f'"{key}":', f'"{delimiter}{key}{delimiter}":')
+            elif field.count(f'"{key}:') == 1:
+                field = field.replace(f'"{key}:', f'"{delimiter}{key}{delimiter}":')
+            elif field.count(f'{key}":') == 1:
+                field = field.replace(f'{key}":', f'"{delimiter}{key}{delimiter}":')
+                
+            ## Cases with delimiter but with incomplete quotations
+            elif field.count(f'{delimiter}{key}{delimiter}:') == 1:
+                field = field.replace(f'{delimiter}{key}{delimiter}:', f'"{delimiter}{key}{delimiter}":')
+            elif field.count(f'"{delimiter}{key}{delimiter}:') == 1:
+                field = field.replace(f'"{delimiter}{key}{delimiter}:', f'"{delimiter}{key}{delimiter}":')
+            elif field.count(f'{delimiter}{key}{delimiter}":') == 1:
+                field = field.replace(f'{delimiter}{key}{delimiter}":', f'"{delimiter}{key}{delimiter}":')
+            elif field.count(f"'{delimiter}{key}{delimiter}:") == 1:
+                field = field.replace(f"'{delimiter}{key}{delimiter}:", f"'{delimiter}{key}{delimiter}':")
+            elif field.count(f"{delimiter}{key}{delimiter}':") == 1:
+                field = field.replace(f"{delimiter}{key}{delimiter}':", f"'{delimiter}{key}{delimiter}':")
             else:
-                raise Exception(f'''"{key}" not in json string output. You must use \"{delimiter}{{key}}{delimiter}\" to enclose the {{key}}.''')
-
+                raise Exception(f'''The key "{delimiter}{key}{delimiter}" is not present in json output. Ensure that you include this key in the json output.''')
+                
     # if all is good, we then extract out the fields
     # Use regular expressions to extract keys and values
-    pattern = fr",*\s*['|\"]{delimiter}([^#]*){delimiter}['|\"]: "
+    pattern = fr",*\s*['|\"]{delimiter}([^#]*){delimiter}['|\"]:\s*"
 
     matches = re.split(pattern, str(field[1:-1]).strip())
 
@@ -349,7 +369,7 @@ def wrap_with_angle_brackets(d: dict, delimiter: str, delimiter_num: int) -> dic
         return d
     
 def chat(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5-turbo', temperature: float = 0, verbose: bool = False, host: str = 'openai', llm = None, **kwargs):
-    '''Performs a chat with the host's LLM model with system prompt, user prompt, model, verbose and kwargs
+    r"""Performs a chat with the host's LLM model with system prompt, user prompt, model, verbose and kwargs
     Returns the output string res
     - system_prompt: String. Write in whatever you want the LLM to become. e.g. "You are a \<purpose in life\>"
     - user_prompt: String. The user input. Later, when we use it as a function, this is the function input
@@ -363,7 +383,7 @@ def chat(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5-turbo', tem
         - Output:
             - res: String. The response of the LLM call
     - **kwargs: Dict. Additional arguments for LLM chat
-    '''
+    """
     if llm is not None:
         ''' If you specified your own LLM, then we just feed in the system and user prompt 
         LLM function should take in system prompt (str) and user prompt (str), and output a response (str) '''
@@ -378,7 +398,8 @@ def chat(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5-turbo', tem
                 assert(model in ['gpt-4-1106-preview', 'gpt-3.5-turbo-1106'])
             except Exception as e:
                 model = 'gpt-3.5-turbo-1106'
-                
+
+        from openai import OpenAI
         client = OpenAI()
         response = client.chat.completions.create(
             model=model,
@@ -401,7 +422,7 @@ def chat(system_prompt: str, user_prompt: str, model: str = 'gpt-3.5-turbo', tem
 
 ### Main Functions ###
 def strict_json(system_prompt: str, user_prompt: str, output_format: dict, return_as_json = False, custom_checks: dict = None, check_data = None, delimiter: str = '###', num_tries: int = 3, openai_json_mode: bool = False, **kwargs):
-    ''' Ensures that OpenAI will always adhere to the desired output JSON format defined in output_format. 
+    r""" Ensures that OpenAI will always adhere to the desired output JSON format defined in output_format.
     Uses rule-based iterative feedback to ask GPT to self-correct.
     Keeps trying up to num_tries it it does not. Returns empty JSON if unable to after num_tries iterations.
     
@@ -421,7 +442,7 @@ def strict_json(system_prompt: str, user_prompt: str, output_format: dict, retur
     
     Output:
     - res: Dict. The JSON output of the model. Returns {} if JSON parsing failed.
-    '''
+    """
     # default initialise custom_checks to {}
     if custom_checks is None:
         custom_checks = {}
@@ -460,8 +481,9 @@ def strict_json(system_prompt: str, user_prompt: str, output_format: dict, retur
         # wrap the values with angle brackets and wrap keys with delimiter to encourage LLM to modify it
         new_output_format = wrap_with_angle_brackets(output_format, delimiter, 1)
         
-        output_format_prompt = f'''\nOutput in the following json string format: {new_output_format}
-Update text enclosed in <>. Output only a valid json string beginning with {{ and ending with }}'''
+        output_format_prompt = f'''\nOutput using the following json template: {new_output_format}
+Update values enclosed in <> and remove the <>. 
+Output only a valid json beginning with {{ and ending with }} and ensure that the following keys are present: {list(new_output_format.keys())}'''
 
         for i in range(num_tries):
             my_system_prompt = str(system_prompt) + output_format_prompt + error_msg
@@ -471,8 +493,16 @@ Update text enclosed in <>. Output only a valid json string beginning with {{ an
             res = chat(my_system_prompt, my_user_prompt, **kwargs)
             
             # extract only the chunk including the opening and closing braces
+            # generate the { or } if LLM has forgotten to do so
             startindex = res.find('{')
+            if startindex == -1:
+                startindex = 0
+                res = '{' + res
             endindex = res.rfind('}')
+            if endindex == -1:
+                res = res + '}'
+                endindex = len(res) - 1
+            
             res = res[startindex: endindex+1]
 
             # try-catch block to ensure output format is adhered to

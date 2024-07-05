@@ -1,3 +1,31 @@
+3 Jul 2024 (v3.0.0)
+- Edited the `strict_json` and `strict_json_async` prompt to list out all the json output keys, so that the LLM will be more grounded
+- Edited the `convert_to_dict` function in `base.py` to make it more robust to variations of incorrect keys, edited error message for incorrect key to make it more robust
+- Changed the `conversation.py` Conversable Class to make it output Action Done in text format (instead of Subtasks Completed), which could be understood by LLMs in a better way
+- Ensured the examples in Tutorial 7 would work for ChatGPT, Claude Haiku and Llama3 70B
+- Despite repeated attempts to ensure compatibility for Llama3 8B, the json generating abilities are not good enough for TaskGen purposes
+
+2 Jul 2024 (v2.6.0)
+- Removed Actual Subtasks in get_next_subtasks() of Agent and AsyncAgent. It was interferring with getting the functions for Function Calling.
+
+2 Jul 2024 (v2.5.1)
+- Added auto-chunking for memory with pdf, csv, excel, docx files using `add_file` method in Memory class (Credit: Prince Saroj)
+- Updated Tutorial 4 to use docstring for external functions, and to showcase auto-chunking in memory (Credit: Prince Saroj)
+- Added in llm from agent to Memory as default, so that Memory retrieve_by_llm could be done via the same llm as the agent
+- Added in dependencies: langchain, PyPDF2, python-docx, pandas, xlrd
+
+1 Jul 2024 (v2.5.0)
+- Added `ConversableAgent` class in `conversation.py`
+- For Agent's query() function, changed it to using user_prompt instead of system_prompt, as it caused ChatGPT some issues in identifying the user input when user_prompt was blank
+- Changed Updated Subtask to Actual Subtask in get_next_subtask in agent.py, for robustness
+- Changed `contribute_agent` code to be done without the need for git clone (Credit: Hardik)
+- Only import OpenAI when necessary in ranker.py, base.py, base_async.py (Credit: JiangZhuo)
+
+28 Jun 2024 (v2.4.1)
+- Added `code_action` as an input variable for Agent, which when set to True, will by default use the `python_generate_and_run_code_tool` function all the time except for end_task (which you need to equip to the Agent yourself externally)
+- Updated Tutorial 6 for Code as Action agent
+- Fixed some minor issues for `contribute_agent` code
+
 2 Jun 2024 (v2.4.0)
 - Added Async Support for `Agent`, `Function` and `strict_json` (credit to Prince Saroj)
 - New Async Classes: AsyncAgent, AsyncFunction, AsyncMemory, AsyncRanker
