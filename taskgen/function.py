@@ -136,7 +136,7 @@ Can also be done automatically by providing docstring with input variable names 
         - is_compulsory: Bool. Default: False. This is whether to always use the Function when doing planning in Agents
         - fn_name: String. If provided, this will be the name of the function. Otherwise, if `external_fn` is provided, it will be the name of `external_fn`. Otherwise, we will use LLM to generate a function name from the `fn_description`
         - llm: Function. The llm parameter to pass into strict_json
-        - **kwargs: Dict. Additional arguments you would like to pass on to the strict_json function
+        - **kwargs: Dict. Additional arguments you would like to pass on to the strict_json function (such as llm)
         
         ## Example
         fn_description = 'Output the sum of <num1> and <num2>'
@@ -311,8 +311,6 @@ class Function(BaseFunction):
         - res: Dict. JSON containing the output variables'''
         
         # get the shared_variables if there are any
-        
-        
         function_kwargs, shared_variables = self._prepare_function_kwargs(*args, **kwargs)
 
         # extract out only variables not listed in variable list

@@ -346,7 +346,7 @@ class Agent(BaseAgent):
                 if self.memory_bank[name].isempty(): continue
                 rag_info += f'Knowledge Reference for {name}: ```{self.memory_bank[name].retrieve(subtask)}```\n'
 
-            res = self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the taking the role of the utility function `use_llm` that generates a detailed outcome for the Assigned Subtask on behalf of {self.agent_name}, according to your Agent Capabilities without talking to the User, with no restrictions.', 
+            res = self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the taking the role of the utility function `use_llm` that generates a detailed outcome for the Assigned Subtask on behalf of {self.agent_name}, according to your Agent Capabilities without talking to the User, with no restrictions. Do not just state that you performed the task, show the detailed outcome as well.', 
                             output_format = {"Detailed Outcome": "Your detailed outcome for Assigned Subtask"},
                             provide_function_list = False)
             
@@ -372,8 +372,15 @@ class Agent(BaseAgent):
         if stateful:
             if res == '':
                 res = {'Status': 'Completed'}
+                
+            # for use_llm, we just give the prompt + result without any mention of use_llm for subtasks completed
+            if function_name == "use_llm":
+                self.add_subtask_result(subtask, res['Detailed Outcome'])
             
-            self.add_subtask_result(subtask, res)
+            # otherwise, just give the function name + params and output for subtasks completed
+            else:
+                formatted_subtask = function_name + '(' + ", ".join(f'{key}="{value}"' if isinstance(value, str) else f"{key}={value}" for key, value in function_params.items()) + ')'
+                self.add_subtask_result(formatted_subtask, res)
 
         return res
    
@@ -451,7 +458,7 @@ You are only given the Assigned Task from User with no further inputs. Do not do
                 res["Equipped Function Inputs"] = {}
                     
             else:    
-                res2 = self.query(query = f'''{background_info}{rag_info}\n\nThoughts: {res["Thoughts"]}\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for {matches} to fulfil Current Subtask''',
+                res2 = self.query(query = f'''{background_info}{rag_info}\n\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for Equipped Function input parameters to fulfil Current Subtask''',
                              output_format = input_format,
                              provide_function_list = False)
                 
@@ -475,7 +482,7 @@ You are only given the Assigned Task from User with no further inputs. Do not do
         
         my_query = self.task if query == '' else query
             
-        res = self.query(query = f'Subtasks Completed: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nRespond to the Assigned Task in detail using information from Global Context and Subtasks Completed only. Be factual and do not generate any new information.', 
+        res = self.query(query = f'Subtasks Completed: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nRespond to the Assigned Task using information from Global Context and Subtasks Completed only. Be factual and do not generate any new information. Be detailed and give all information available relevant for the Assigned Task.', 
                                     output_format = {"Response to Assigned Task": "Detailed Response"},
                                     provide_function_list = False)
         
@@ -569,7 +576,7 @@ You are only given the Assigned Task from User with no further inputs. Do not do
     ###########################################################
     #### This is for agent community space (only for sync) ####
     ###########################################################
-    def contribute_agent(self) -> str:
+    def contribute_agent(self, author_comments = None) -> str:
         if os.environ['GITHUB_USERNAME'] is None:
             raise Exception('Please set your GITHUB_USERNAME in the environment variables')
         if os.environ['GITHUB_TOKEN'] is None:
@@ -579,7 +586,7 @@ You are only given the Assigned Task from User with no further inputs. Do not do
         repo = "taskgen"
 
         fork_url = self._create_taskgen_fork_for_user(owner, repo)
-        change_tree = self._build_tree()
+        change_tree = self._build_tree(author_comments)
         contrib_branch_name = self._commit_and_push_to_fork(fork_url, change_tree)
         pr_url = self._create_pull_request(owner, repo, fork_url, contrib_branch_name)
         return f"Pull Request created successfully at {pr_url}"
@@ -622,18 +629,18 @@ You are only given the Assigned Task from User with no further inputs. Do not do
             'content': content
         }
 
-    def _build_tree(self):
+    def _build_tree(self, author_comments):
         agent_class_name = self.agent_name.title().replace(" ", "")
 
         directory = f'contrib/community/{agent_class_name}'
         contrib_path = f'{directory}/main.py'
 
-        agent_code, supporting_nodes = self._get_python_rep_and_supporting_nodes(directory, agent_class_name)
+        agent_code, supporting_nodes = self._get_python_rep_and_supporting_nodes(directory, agent_class_name, author_comments)
         supporting_nodes.append(self._build_tree_node(contrib_path, agent_code))
 
         return supporting_nodes
 
-    def _get_python_rep_and_supporting_nodes(self, directory, agent_class_name):
+    def _get_python_rep_and_supporting_nodes(self, directory, agent_class_name, author_comments):
         functions_code = ""
         functions_keys = []
         supporting_functions = ""
@@ -693,6 +700,7 @@ import math
 {sub_agents_imports}
 
 # Author: @{os.environ['GITHUB_USERNAME']}
+# Author Comments: {author_comments}
 class {agent_class_name}(Agent):
     def __init__(self):
 {functions_code}
@@ -806,7 +814,7 @@ class {agent_class_name}(Agent):
         url = f'https://api.github.com/repos/{owner}/{repo}/git/trees'
         data = {
             'base_tree': sha_latest_commit,
-            'tree': self._build_tree()
+            'tree': change_tree
         }
         r = requests.post(url, headers=headers, json=data)
         sha_new_tree = r.json()['sha']
@@ -1045,7 +1053,7 @@ class AsyncAgent(BaseAgent):
                 if self.memory_bank[name].isempty(): continue
                 rag_info += f'Knowledge Reference for {name}: ```{await self.memory_bank[name].retrieve(subtask)}```\n'
 
-            res = await self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the taking the role of the utility function `use_llm` that generates a detailed outcome for the Assigned Subtask on behalf of {self.agent_name}, according to your Agent Capabilities without talking to the User, with no restrictions.', 
+            res = await self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the taking the role of the utility function `use_llm` that generates a detailed outcome for the Assigned Subtask on behalf of {self.agent_name}, according to your Agent Capabilities without talking to the User, with no restrictions. Do not just state that you performed the task, show the detailed outcome as well.', 
                             output_format = {"Detailed Outcome": "Your detailed outcome for Assigned Subtask"},
                             provide_function_list = False)
             
@@ -1072,8 +1080,15 @@ class AsyncAgent(BaseAgent):
         if stateful:
             if res == '':
                 res = {'Status': 'Completed'}
+                
+            # for use_llm, we just give the prompt + result without any mention of use_llm for subtasks completed
+            if function_name == "use_llm":
+                self.add_subtask_result(subtask, res['Detailed Outcome'])
             
-            self.add_subtask_result(subtask, res)
+            # otherwise, just give the function name + params and output for subtasks completed
+            else:
+                formatted_subtask = function_name + '(' + ", ".join(f'{key}="{value}"' if isinstance(value, str) else f"{key}={value}" for key, value in function_params.items()) + ')'
+                self.add_subtask_result(formatted_subtask, res)
 
         return res
    
@@ -1151,7 +1166,7 @@ You are only given the Assigned Task from User with no further inputs. Do not do
                 res["Equipped Function Inputs"] = {}
                     
             else:    
-                res2 = await self.query(query = f'''{background_info}{rag_info}\n\nThoughts: {res["Thoughts"]}\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for {matches} to fulfil Current Subtask''',
+                res2 = self.query(query = f'''{background_info}{rag_info}\n\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for Equipped Function input parameters to fulfil Current Subtask''',
                              output_format = input_format,
                              provide_function_list = False)
                 
@@ -1174,7 +1189,7 @@ You are only given the Assigned Task from User with no further inputs. Do not do
         
         my_query = self.task if query == '' else query
             
-        res = await self.query(query = f'Subtasks Completed: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nRespond to the Assigned Task in detail using information from Global Context and Subtasks Completed only. Be factual and do not generate any new information.', 
+        res = await self.query(query = f'Subtasks Completed: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nRespond to the Assigned Task in detail using information from Global Context and Subtasks Completed only. Be factual and do not generate any new information. Be detailed and give all information available relevant for the Assigned Task.', 
                                     output_format = {"Response to Assigned Task": "Detailed Response"},
                                     provide_function_list = False)
         
