@@ -1,4 +1,4 @@
-# TaskGen v3.0.0
+# TaskGen v3.1.0
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 - Video (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
@@ -51,10 +51,37 @@ I can't wait to see what this new framework can do for you!
 - gpt-4-turbo and more advanced models can perform better zero-shot without much examples
 - TaskGen is compatible with ChatGPT and similar models, but for more robust use, consider using gpt-4-turbo and better models
 
-# Agent Basics - See Tutorial 1
+# 1. Agent Basics
 - Create an agent by entering your agent's name and description
 - Agents are task-based, so they will help generate subtasks to fulfil your main task
+
 - Agents are made to be non-verbose, so they will just focus only on task instruction (Much more efficient compared to conversational-based agentic frameworks like AutoGen)
+- Agent's interactions will be stored into `subtasks_completed` by default, which will serve as a memory buffer for future interactions
+
+- **Inputs for Agent**:
+    - **agent_name**: String. Name of agent, hinting at what the agent does
+    - **agent_description**: String. Short description of what the agent does
+    - **max_subtasks**: Int. Default: 5. The maximum number of subtasks the agent can have
+    - **verbose**: Bool. Default: True. Whether to print out agent's intermediate thoughts
+<br/><br/>
+
+- **Agent Internal Parameters**:
+    - **Task**: String. The task the agent has been assigned to - Defaults to "No task assigned"
+    - **Subtasks Completed**: Dict. The keys are the subtask names and the values are the result of the respective subtask
+    - **Is Task Completed**: Bool. Whether the current Task is completed
+<br/><br/>
+
+- **Task Running**
+    - **reset()**: Resets the Agent Internal Parameters and Subtasks Completed. You should do this at the start of every new task assigned to the Agent to minimise potential confusion of what has been done for this task versus previous tasks
+    - **run(task: str, num_subtasks: int = max_subtasks)**: Performs the task. Do note that agent's state will not be reset, so if you want to reset it, call reset() prior to running this. Runs the task for **num_subtasks** steps. If not specified, we will take the **max_subtasks**.
+<br/><br/>
+
+- **Give User Output**
+    - **reply_user(query: str = '', stateful: bool = True)**: Using all information from subtasks, give a reply about the `query` to the user. If `query` is not given, then it replies based on the current task the agent is doing. If `stateful` is True, saves this query and reply into `subtasks_completed`
+<br/><br/>
+    
+- **Check status of Agent**:
+    - **status()**: Lists out Agent Name, Agent Description, Available Functions (default function is to use the LLM), Task, Subtasks Completed and Is Task Completed
     
 ## Example Agent Creation
 ```python
@@ -64,7 +91,6 @@ my_agent = Agent('Helpful assistant', 'You are a generalist agent')
 ## Example Agent Task Running - Split the assigned task into subtasks and execute each of them
 
 ```python
-# Run your agent
 output = my_agent.run('Give me 5 words rhyming with cool, and make a 4-sentence poem using them')
 ```
 
@@ -79,15 +105,6 @@ output = my_agent.run('Give me 5 words rhyming with cool, and make a 4-sentence 
 > In the school, the golden rule is to never be a fool. Use your mind as a tool, and always follow the pool.
 
 `Task completed successfully!`
-
-## Example Agent Reply to User - Reference the subtasks' output to answer the user's query
-```python
-output = my_agent.reply_user()
-```
-
-`
-Here are 5 words that rhyme with "cool": pool, rule, fool, tool, school. Here is a 4-sentence poem using these words: "In the school, the golden rule is to never be a fool. Use your mind as a tool, and always follow the pool."
-`
 
 ## Check Agent's Status
 ```python
@@ -114,91 +131,41 @@ my_agent.status()
 
 `Is Task Completed: True`
 
-## Functions
-- Enhances ```strict_json()``` with a function-like interface for repeated use of modular LLM-based functions (or wraps external functions)
-- Use angle brackets <> to enclose input variable names. First input variable name to appear in `fn_description` will be first input variable and second to appear will be second input variable. For example, `fn_description = 'Adds up two numbers, <var1> and <var2>'` will result in a function with first input variable `var1` and second input variable `var2`
-- (Optional) If you would like greater specificity in your function's input, you can describe the variable after the : in the input variable name, e.g. `<var1: an integer from 10 to 30>`. Here, `var1` is the input variable and `an integer from 10 to 30` is the description.
-- (Optional) If your description of the variable is one of `int`, `float`, `str`, `dict`, `list`, `array`, `Dict[]`, `List[]`, `Array[]`, `Enum[]`, `bool`, we will enforce type checking when generating the function inputs in `get_next_subtask` method of the `Agent` class. Example: `<var1: int>` Refer to Tutorial 0, Section 3. Type Forcing Output Variables for details.
-- Inputs (primary):
-    - **fn_description**: String. Function description to describe process of transforming input variables to output variables. Variables must be enclosed in <> and listed in order of appearance in function input.
-        - New feature: If `external_fn` is provided and no `fn_description` is provided, then we will automatically parse out the fn_description based on docstring of `external_fn`. Only requirement is that the docstring must contain the names of all compulsory input variables
-    - **output_format**: Dict. Dictionary containing output variables names and description for each variable.
-    
-- Inputs (optional):
-    - **examples** - Dict or List[Dict]. Examples in Dictionary form with the input and output variables (list if more than one)
-    - **external_fn** - Python Function. If defined, instead of using LLM to process the function, we will run the external function. 
-        If there are multiple outputs of this function, we will map it to the keys of `output_format` in a one-to-one fashion
-    - **fn_name** - String. If provided, this will be the name of the function. Ohterwise, if `external_fn` is provided, it will be the name of `external_fn`. Otherwise, we will use LLM to generate a function name from the `fn_description`
-    - **kwargs** - Dict. Additional arguments you would like to pass on to the strict_json function
-        
-- Outputs:
-    JSON of output variables in a dictionary (similar to ```strict_json```)
-    
-#### Example Internal LLM-Based Function
+## Example Agent Reply to User - Reference the subtasks' output to answer the user's query
 ```python
-# Construct the function: var1 will be first input variable, var2 will be second input variable and so on
-sentence_style = Function(fn_description = 'Output a sentence with words <var1> and <var2> in the style of <var3>', 
-                     output_format = {'output': 'sentence'})
-
-# Use the function
-sentence_style('ball', 'dog', 'happy') #var1, var2, var3
+output = my_agent.reply_user()
 ```
 
-#### Example Output
-```{'output': 'The happy dog chased the ball.'}```
-    
-#### Example External Function
-```python
-def binary_to_decimal(x):
-    return int(str(x), 2)
+`
+Here are 5 words that rhyme with "cool": pool, rule, fool, tool, school. Here is a 4-sentence poem using these words: "In the school, the golden rule is to never be a fool. Use your mind as a tool, and always follow the pool."
+`
 
-# an external function with a single output variable, with an expressive variable description
-b2d = Function(fn_description = 'Convert input <x: a binary number in base 2> to base 10', 
-            output_format = {'output1': 'x in base 10'},
-            external_fn = binary_to_decimal)
-
-# Use the function
-b2d(10) #x
-```
-
-#### Example Output
-```{'output1': 2}```
-
-#### Example fn_description inferred from type hints and docstring of External Function
-```python
-# Docstring must provide all input variables
-# We will ignore shared_variables, *args and **kwargs
-from typing import List
-def add_number_to_list(num1: int, num_list: List[int], *args, **kwargs) -> List[int]:
-    '''Adds num1 to num_list'''
-    num_list.append(num1)
-    return num_list
-
-fn = Function(external_fn = add_number_to_list, 
-    #output_format = {'num_array': 'Array of numbers'} ## If you would like to name output variables (helps with LLM understanding), define your own output_format
-             )
-
-str(fn)
-```
-
-#### Example Output
-`Description: Adds Adds <num1: int> to <num_list: list[int]>`
-
-`Input: ['num1', 'num_list']`
-
-`Output: {'output_1': 'list[int]'}`
-
-## Power Up your Agents - Bring in Functions (aka Tools)
-- After creating your agent, use `assign_functions` to assign a list of functions (of class Function) to it
+# 2. Power Up your Agents - Bring in Functions (aka Tools)
+- First define the functions, either using class `Function` (see Tutorial 0), or just any Python function with input and output types defined in the signature and with a docstring
+- After creating your agent, use `assign_functions` to assign a list of functions of class `Function`, or general Python functions (which will be converted to AsyncFunction)
 - Function names will be automatically inferred if not specified
 - Proceed to run tasks by using `run()`
 
 ```python
+# This is an example of an LLM-based function (see Tutorial 0)
+sentence_style = Function(fn_description = 'Output a sentence with words <var1> and <var2> in the style of <var3>', 
+                         output_format = {'output': 'sentence'},
+                         fn_name = 'sentence_with_objects_entities_emotion',
+                         llm = llm)
+
+# This is an example of an external user-defined function (see Tutorial 0)
+def binary_to_decimal(binary_number: str) -> int:
+    '''Converts binary_number to integer of base 10'''
+    return int(str(binary_number), 2)
+
+# Initialise your Agent
 my_agent = Agent('Helpful assistant', 'You are a generalist agent')
 
-my_agent.assign_functions([sentence_style, b2d])
+# Assign the functions
+my_agent.assign_functions([sentence_style, binary_to_decimal])
 
-output = my_agent.run('Generate me a happy sentence with a number and a ball. The number is 1001 converted to decimal')
+# Run the Agent
+output = my_agent.run('First convert binary string 1001 to a number, then generate me a happy sentence with that number and a ball')
 ```
 
 `Subtask identified: Convert the binary number 1001 to decimal`
@@ -213,172 +180,153 @@ output = my_agent.run('Generate me a happy sentence with a number and a ball. Th
 
 `Task completed successfully!`
 
-## Saving and Loading Agents
-Sometimes you want to configure your agents and save them and load them elsewhere, while maintaining the current agent state
+- Approach 1: Automatically Run your agent using `run()`
 
-- When you use the `save_agent` function, we store the entire agent's internal state, include name, description, list of functions, subtasks history and all other internal variables into a pickle file
-- When you use the `load_agent` function, and we will load the entire agent saved in the pickle file into the existing agent
+- Approach 2: Manually select and use functions for your task
+    - **select_function(task: str)**: Based on the task, output the next function name and input parameters
+    - **use_function(function_name: str, function_params: dict, subtask: str = '', stateful: bool = True)**: Uses the function named `function_name` with `function_params`. `stateful` controls whether the output of this function will be saved to `subtasks_completed` under the key of `subtask`
+<br/><br/>
 
-Key functions:
-- **save_agent(pickle_file_name: str)**: Saves the agent's internal parameters to a pickle file named pickle_file_name (include .pkl), returns the pickle file
-- **load_agent(pickle_file_name: str)**: Loads the agent's internal parameters from a pickle file named pickle_file_name (include .pkl), returns loaded agent
+- **Assign/Remove Functions**:
+    - **assign_functions(function_list: list)**: Assigns a list of functions to the agent
+    - **remove_function(function_name: str)**: Removes function named function_name from the list of assigned functions
+<br/><br/>
 
-#### Example 1: Saving Agent
+- **Show Functions**:
+    - **list_functions()**: Returns the list of functions of the agent
+    - **print_functions()**: Prints the list of functions of the agent
+<br/><br/>
+
+# 3. AsyncAgent
+
+- `AsyncAgent` works the same way as `Agent`, only much faster due to parallelisation of tasks
+- It can only be assigned functions of class `AsyncFunction`, or general Python functions (which will be converted to AsyncFunction)
+- If you define your own `AsyncFunction`, you should define the fn_name as well if it is not an External Function
+- As a rule of thumb, just add the `await` keyword to any function that you run with the `AsyncAgent`
+
+#### Example LLM in Async Mode
 ```python
-my_agent.save_agent('myagent.pkl')
+async def llm_async(system_prompt: str, user_prompt: str):
+    ''' Here, we use OpenAI for illustration, you can change it to your own LLM '''
+    # ensure your LLM imports are all within this function
+    from openai import AsyncOpenAI
+    
+    # define your own LLM here
+    client = AsyncOpenAI()
+    response = await client.chat.completions.create(
+        model='gpt-3.5-turbo',
+        temperature = 0,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+    )
+    return response.choices[0].message.content
 ```
 
-#### Example Output
-```Agent saved to myagent.pkl```
-
-#### Example 2: Loading Agent
+#### Example Agentic Workflow
 ```python
-new_agent = Agent().load_agent('myagent.pkl')
+# This is an example of an LLM-based function (see Tutorial 0)
+sentence_style = AsyncFunction(fn_description = 'Output a sentence with words <var1> and <var2> in the style of <var3>', 
+                         output_format = {'output': 'sentence'},
+                         fn_name = 'sentence_with_objects_entities_emotion', # you must define fn_name for LLM-based functions
+                         llm = llm_async) # use an async LLM function
+
+# This is an example of an external user-defined function (see Tutorial 0)
+def binary_to_decimal(binary_number: str) -> int:
+    '''Converts binary_number to integer of base 10'''
+    return int(str(binary_number), 2)
+
+# Initialise your Agent
+my_agent = AsyncAgent('Helpful assistant', 'You are a generalist agent')
+
+# Assign the functions
+my_agent.assign_functions([sentence_style, binary_to_decimal])
+
+# Run the Agent
+output = await my_agent.run('Generate me a happy sentence with a number and a ball. The number is b1001 converted to decimal')
 ```
 
-#### Example Output
-```Agent loaded from myagent.pkl```
-
-# Inception: Agents within Agents - See Tutorial 2
-- You can also create a Meta Agent that uses other Agents (referred to as Inner Agents) as functions
-- Create your Meta agent using `Agent()` (Note: No different from usual process of creating Agents - your Meta Agent is also an Agent)
-- Set up an Inner Agent list and assign it to your Meta agent using `assign_agents(agent_list)`
-
-## Example Meta Agent Setup
-```python
-# Define your meta-agent
-my_agent = Agent('Menu Creator', 
-                 'Creates a menu for a restaurant. Menu item includes Name, Description, Ingredients, Pricing.')
-
-# Define your agent list. Note you can just assign functions to the agent in place using .assign_functions(function_list)
-agent_list = [
-    Agent('Chef', 'Takes in dish names and comes up with ingredients for each of them. Does not generate prices.'),
-    Agent('Boss', ''Does final quality check on menu items'),
-    Agent('Creative Writer', 'Takes in a cuisine type and generates interesting dish names and descriptions. Does not generate prices or ingredients.', max_subtasks = 2),
-    Agent('Economist', 'Takes in dish names and comes up with fictitious pricing for each of them')
-    ]
-
-my_agent.assign_agents(agent_list)
-```
-
-## Run the Meta Agent
-- Let us run the agent and see the interactions between the Meta Agent and Inner Agents to solve the task!
-```python
-output = my_agent.run('Give me 5 menu items with name, description, ingredients and price based on Italian food choices. Ensure all parts of menu are generated.')
-```
-
-# Shared Variables - See Tutorial 3
+# 4. Shared Variables
 
 *"Because text is not enough"* - Anonymous
 
 - `shared_variables` is a dictionary, that is initialised in Agent (default empty dictionary), and can be referenced by any function of the agent (including Inner Agents and their functions)
 - This can be useful for non-text modalitiies (e.g. audio, pdfs, image) and lengthy text modalities, which we do not want to output into `subtasks_completed` directly
-- `s_` at the start of the variable names means shared variables
-    - For input, it means we take the variable from `shared_variables` instead of LLM generated input
-    - For output, it means we store the variable into `shared_variables` instead of storing it in `subtasks_completed`. If `subtasks_completed` output is empty, it will be output as `{'Status': 'Completed'}`
-- Example shared variables names: `s_sum`, `s_total`, `s_list_of_words`
+- To use, simply define an External Function with `shared_variables` as the first input variable, from which you can access and modify `shared_variables` directly
+- The agent will also be able to be self-referenced in the External Function via `shared_variables['agent']`, so you can change the agent's internal parameters via `shared_variables`
+- If the function has no output because the output is stored in `shared_variables`, the default return value will be `{'Status': 'Completed'}`
 
-## Example Input
-```python
-# Function takes in increment (LLM generated) and s_total (retrieves from shared variable dict), and outputs to s_total (in shared variable dict)
-add = Function(fn_description = "Add <increment: int> to <s_total>", 
-              output_format = {"s_total": "Modified total"})
-
-# Define the calculator agent and the shared_variables - Note the naming convention of s_ at the start of the names for shared variables
-my_agent = Agent('Calculator', 'Does computations', shared_variables = {'s_total': 0}).assign_functions([add])
-
-output = my_agent.run('Increment total by 1')
-
-print('Shared Variables:', my_agent.shared_variables)
-```
-
-## Example Output
-`Subtask identified: Add 1 to the total`
-
-`Calling function add_int_to_variable with parameters {'increment': 1}`
-> {'Status': 'Completed'}
-
-`Task completed successfully!`
-
-`Shared Variables: {'s_total': 1}`
-
-## Example External Function Accessing Shared Variables (Advanced)
+### Example External Function using `shared_variables`
 ```python
 # Use shared_variables as input to your external function to access and modify the shared variables
 def generate_quotes(shared_variables, number_of_quotes: int, category: str):
     ''' Generates number_of_quotes quotes about category '''
     # Retrieve from shared variables
-    my_quote_list = shared_variables['quote_list']
+    my_quote_list = shared_variables['Quote List']
     
-    ### Add your function code here ###
+    # Generate the quotes
+    res = strict_json(system_prompt = f'''Generate {number_of_quotes} sentences about {category}. 
+Do them in the format "<Quote> - <Person>", e.g. "The way to get started is to quit talking and begin doing. - Walt Disney"
+Ensure your quotes contain only ' within the quote, and are enclosed by " ''',
+                      user_prompt = '',
+                      output_format = {'Quote List': f'list of {number_of_quotes} quotes, type: List[str]'},
+                      llm = llm)
+    
+    my_quote_list.extend([f'Category: {category}. '+ x for x in res['Quote List']])
     
     # Store back to shared variables
-    shared_variables['quote_list'] = my_quote_list
-
-generate_quote_fn = Function(output_format = {}, external_fn = generate_quotes)
+    shared_variables['Quote List'] = my_quote_list
 ```
 
-# Memory - See Tutorial 4
+# 5. Global Context
 
-## Key Philosophy
-- It would be important to learn from past experience and improve the agentic framework - memory is key to that
-- You can add to the memory bank of your Agents pre-inference (by collecting from a pool of data prior to running the Agent), or during inference (add on in between running subtasks)
+- `Global Context` is a very powerful feature in TaskGen, as it allows the Agent to be updated with the latest environmental state before every decision it makes
+- It also allows for learnings in `shared_variables` to be carried across tasks, making the Agent teachable and learn through experiences
+- A recommended practice is to always store the learnings of the Agent during the External Function call, and reset the Agent after each task, so that `subtasks_completed` will be as short as possible to avoid confusion to the Agent
 
-## Use Memory in Agents
-- Agent class takes `memory_bank` as a parameter during initialisation of an `Agent`
-- memory_bank: class Dict[Memory]. Stores multiple types of memory for use by the agent. Customise the Memory config within the Memory class.
-    - Default: `memory_bank = {'Function': Memory(top_k = 5, mapper = lambda x: x.fn_description, approach = 'retrieve_by_ranker')}`
-    - Key: `Function` (Already Implemented Natively) - Does RAG over Task -> Function mapping
-    - Can add in more keys that would fit your use case. Retrieves similar items to task/overall plan (if able) for additional context in `get_next_subtasks()` and `use_llm()` function
-    - Side Note: RAG can also be done (and may be preferred) as a separate function of the Agent to retrieve more information when needed (so that we do not overload the Agent with information)
-
-## Memory Class
-- Retrieves top k memory items based on task 
-- Inputs:
-    - `memory`: List. Default: Empty List. The list containing the memory items
-    - `top_k`: Int. Default: 3. The number of memory list items to retrieve
-    - `mapper`: Function. Maps the memory item to another form for comparison by ranker or LLM. Default: `lambda x: x`
-        - Example mapping: `lambda x: x.fn_description` (If x is a Class and the string you want to compare for similarity is the fn_description attribute of that class)
-    - `approach`: str. Either `retrieve_by_ranker` or `retrieve_by_llm` to retrieve memory items.
-        - Ranker is faster and cheaper as it compares via embeddings, but are inferior to LLM-based methods for context information
-    - `ranker`: `Ranker`. The Ranker which defines a similarity score between a query and a key. Default: OpenAI `text-embedding-3-small` model. 
-        - Can be replaced with a function which returns similarity score from 0 to 1 when given a query and key
-        
-## Example Use Case
-- Helps to reduce number of functions present in LLM context for more accurate generation
-```python
-output = my_agent.run('Calculate 2**10 * (5 + 1) / 10')
-```
-
-`Original Function List: add_numbers, subtract_numbers, add_three_numbers, multiply_numbers, divide_numbers, power_of, GCD_of_two_numbers, modulo_of_numbers, absolute_difference, generate_poem_with_numbers, List_related_words, generate_quote`
-
-`Filtered Function Names: add_three_numbers, multiply_numbers, divide_numbers, power_of, modulo_of_numbers`
-
-# Global Context - See Tutorial 5 (Advanced)
-- Agent takes in one additional parameter: `get_global_context`
-- This is a function that takes in the agent's internal parameters (self) and outputs a string to the LLM to append to the prompts of any LLM-based calls internally, e.g. `get_next_subtask`, `use_llm`, `reply_to_user`
-- You have full flexibility to access anything the agent knows and configure a global prompt to the agent
-
-## Uses
-- Used mainly to provide persistent variables to an agent that is not conveniently stored in `subtasks_completed`, e.g. ingredients remaining, location in grid for robot
-<br></br>
-- Implementing your own specific instructions to the default planner prompt
-    - Implement your own memory-based RAG / global prompt instruction if you need more than what the default prompt can achieve
-<br></br>
-- Avoid Multiple Similar Subtasks in `subtasks_history`
-    - If you have multiple similar subtask names, then it is likely the Agent can be confused and think it has already done the subtask
-    - In this case, you can disambiguate by resetting the agent and store the persistent information in `shared_variables` and provide it to the agent using `get_global_context`
-    - Has the benefit of shifting the Start State closer to End State desired by resetting the Agent's planning cycle
+- There are two ways to use `Global Context`, and both can be used concurrently:
+    - 1. `global_context`
+        - If all you need in the global context is `shared_variables` without any modification to it, then you can use `global_context`
+        - `global_context` is a string with `<shared_variables_name>` enclosed with `<>`. These <> will be replaced with the actual variable in `shared_variables`
+    - 2. `get_global_context` 
+        - `get_global_context` is a function that takes in the agent's internal parameters (self) and outputs a string to the LLM to append to the prompts of any LLM-based calls internally, e.g. `get_next_subtask`, `use_llm`, `reply_to_user`
+    - You have full flexibility to access anything the agent knows and process the `shared_variables` as required and configure a global prompt to the agent
     
-# Async Agents, Functions, strict_json (See Tutorial 8 and 9)
-- TaskGen now supports Async functionalities
-- We use `AsyncAgent`, `AsyncFunction` and `strict_json_async`
-    - These are the async equivalents of `Agent`, `Function` and `strict_json`
+## Example for `global_context` : Inventory Manager
+- We can use `Global Context` to keep track of inventory state
+- We simply get the functions `add_item_to_inventory` and `remove_item_from_inventory` to modify the `shared_variable` named `Inventory`
+- Note we can also put rule-based checks like checking if item is in inventory before removing inside the function
+- Even after task reset, the Agent still knows the inventory because of `Global Context`
 
+```python
+def add_item_to_inventory(shared_variables, item: str) -> str:
+    ''' Adds item to inventory, and returns outcome of action '''
+    shared_variables['Inventory'].append(item)
+    return f'{item} successfully added to Inventory'
+    
+def remove_item_from_inventory(shared_variables, item: str) -> str:
+    ''' Removes item from inventory and returns outcome of action '''
+    if item in shared_variables['Inventory']:
+        shared_variables['Inventory'].remove(item)
+        return f'{item} successfully removed from Inventory'
+    else:
+        return f'{item} not found in Inventory, unable to remove'
+    
+agent = Agent('Inventory Manager', 
+              'Adds and removes items in Inventory. Only able to remove items if present in Inventory',
+              shared_variables = {'Inventory': []},
+              global_context = 'Inventory: <Inventory>', # Add in Global Context here with shared_variables Inventory
+              llm = llm).assign_functions([add_item_to_inventory, remove_item_from_inventory])
+```
+    
+# Other Features
+- There are other features like Memory (Tutorial 3), Hierarchical Agents (Tutorial 4), CodeGen and External Function Interfacing (Tutorial 5), Conversation Class (Tutorial 6)
+- These extend the baseline features of TaskGen and you are encouraged to take a look at the Tutorials for more information.
 
 # Known Limitations
 - `gpt-3.5-turbo` is not that great with mathematical functions for Agents. Use `gpt-4-turbo` or better for more consistent results
-- `gpt-3.5-turbo` is not that great with Memory (Tutorial 4). Use `gpt-4-turbo` or better for more consistent results
+- `gpt-3.5-turbo` is not that great with Memory (Tutorial 3). Use `gpt-4-turbo` or better for more consistent results
 
 # Contributing to the project
 

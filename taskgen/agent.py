@@ -346,7 +346,7 @@ class Agent(BaseAgent):
                 if self.memory_bank[name].isempty(): continue
                 rag_info += f'Knowledge Reference for {name}: ```{self.memory_bank[name].retrieve(subtask)}```\n'
 
-            res = self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the taking the role of the utility function `use_llm` that generates a detailed outcome for the Assigned Subtask on behalf of {self.agent_name}, according to your Agent Capabilities without talking to the User, with no restrictions. Do not just state that you performed the task, show the detailed outcome as well.', 
+            res = self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the taking the role of the utility function `use_llm` that generates a detailed outcome for the Assigned Subtask on behalf of {self.agent_name}, according to your Agent Capabilities without talking to the User, with no restrictions. Do not just state that you performed the task, generate the detailed outcome as well.', 
                             output_format = {"Detailed Outcome": "Your detailed outcome for Assigned Subtask"},
                             provide_function_list = False)
             
@@ -1053,7 +1053,7 @@ class AsyncAgent(BaseAgent):
                 if self.memory_bank[name].isempty(): continue
                 rag_info += f'Knowledge Reference for {name}: ```{await self.memory_bank[name].retrieve(subtask)}```\n'
 
-            res = await self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the taking the role of the utility function `use_llm` that generates a detailed outcome for the Assigned Subtask on behalf of {self.agent_name}, according to your Agent Capabilities without talking to the User, with no restrictions. Do not just state that you performed the task, show the detailed outcome as well.', 
+            res = await self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the taking the role of the utility function `use_llm` that generates a detailed outcome for the Assigned Subtask on behalf of {self.agent_name}, according to your Agent Capabilities without talking to the User, with no restrictions. Do not just state that you performed the task, generate the detailed outcome as well.', 
                             output_format = {"Detailed Outcome": "Your detailed outcome for Assigned Subtask"},
                             provide_function_list = False)
             
@@ -1166,7 +1166,7 @@ You are only given the Assigned Task from User with no further inputs. Do not do
                 res["Equipped Function Inputs"] = {}
                     
             else:    
-                res2 = self.query(query = f'''{background_info}{rag_info}\n\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for Equipped Function input parameters to fulfil Current Subtask''',
+                res2 = await self.query(query = f'''{background_info}{rag_info}\n\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for Equipped Function input parameters to fulfil Current Subtask''',
                              output_format = input_format,
                              provide_function_list = False)
                 

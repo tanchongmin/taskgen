@@ -1,3 +1,12 @@
+4 Jul 2024 (v3.1.0)
+- Changed Subtask Completed's subtask to be the function name + function params in order to 1) reduce verbosity, 2) make the subtask accurate as it is what is actually done
+- Made prompt to get input parameters of Equipped Function more concise by removing Thoughts and only focusing on Current Subtask
+- made `contribute_agent()` specify the github user name as well in the agent in order to avoid conflicts between user
+- Fixed a bug with AsyncAgent Function Calling in `run()` due to a missing `await` keyword
+- For `use_llm` function prompt, added "Do not just state that you performed the task, generate the detailed outcome as well." to get it to actually generate stuff out
+- Revamped all Tutorials to use llm variable as default for `Agent`, `Function`, `strict_json`, `strict_json_async`, `AsyncFunction`, `AsyncAgent`
+- Added more examples for Shared Variables and Global Context, which is the bedrock of TaskGen for things like LLM OS. Also, reorganised the Tutorials in order or priority
+
 3 Jul 2024 (v3.0.0)
 - Edited the `strict_json` and `strict_json_async` prompt to list out all the json output keys, so that the LLM will be more grounded
 - Edited the `convert_to_dict` function in `base.py` to make it more robust to variations of incorrect keys, edited error message for incorrect key to make it more robust
@@ -68,7 +77,7 @@
 - Fixed the dictionary input variables to None for `strict_json` and `Function` and `Ranker` as well
 - Added a `retrieve_fn` in `Memory` class to enable vector database queries
 - split function.py from base.py as it was getting large
-- type: code introduced for `strict_json` so we won't force to unicode for all strings with //
+- type: code introduced for `strict_json` so we won't force to unicode for all strings with \\
 
 10 May 2024 (v2.1.1)
 - Ensure that external_fn must be a Python function and not a Class method, as the latter does not encompass all the necessary input variables
