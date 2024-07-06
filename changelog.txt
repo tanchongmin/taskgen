@@ -1,4 +1,4 @@
-4 Jul 2024 (v3.1.0)
+6 Jul 2024 (v3.1.0)
 - Changed Subtask Completed's subtask to be the function name + function params in order to 1) reduce verbosity, 2) make the subtask accurate as it is what is actually done
 - Made prompt to get input parameters of Equipped Function more concise by removing Thoughts and only focusing on Current Subtask
 - made `contribute_agent()` specify the github user name as well in the agent in order to avoid conflicts between user
