@@ -5,7 +5,7 @@
 - Fixed a bug with AsyncAgent Function Calling in `run()` due to a missing `await` keyword
 - For `use_llm` function prompt, added "Do not just state that you performed the task, generate the detailed outcome as well." to get it to actually generate stuff out
 - Revamped all Tutorials to use llm variable as default for `Agent`, `Function`, `strict_json`, `strict_json_async`, `AsyncFunction`, `AsyncAgent`
-- Added more examples for Shared Variables and Global Context, which is the bedrock of TaskGen for things like LLM OS. Also, reorganised the Tutorials in order or priority
+- Added more examples for Shared Variables and Global Context, which is the bedrock of TaskGen for things like LLM OS. Also, reorganised the Tutorials in order of priority
 
 3 Jul 2024 (v3.0.0)
 - Edited the `strict_json` and `strict_json_async` prompt to list out all the json output keys, so that the LLM will be more grounded
