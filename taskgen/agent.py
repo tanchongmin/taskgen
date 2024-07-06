@@ -630,7 +630,7 @@ You are only given the Assigned Task from User with no further inputs. Do not do
         }
 
     def _build_tree(self, author_comments):
-        agent_class_name = self.agent_name.title().replace(" ", "")
+        agent_class_name = f"{self.agent_name.title().replace(' ', '')}_{os.environ['GITHUB_USERNAME'].replace(' ', '')}"
 
         directory = f'contrib/community/{agent_class_name}'
         contrib_path = f'{directory}/main.py'
@@ -640,7 +640,7 @@ You are only given the Assigned Task from User with no further inputs. Do not do
 
         return supporting_nodes
 
-    def _get_python_rep_and_supporting_nodes(self, directory, agent_class_name, author_comments):
+    def _get_python_rep_and_supporting_nodes(self, directory, agent_class_name, author_comments = None):
         functions_code = ""
         functions_keys = []
         supporting_functions = ""
@@ -700,7 +700,7 @@ import math
 {sub_agents_imports}
 
 # Author: @{os.environ['GITHUB_USERNAME']}
-# Author Comments: {author_comments}
+{"# Author Comments: " + author_comments if author_comments else ''}
 class {agent_class_name}(Agent):
     def __init__(self):
 {functions_code}
