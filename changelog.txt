@@ -1,3 +1,14 @@
+10 Jul 2024 (v3.2.0)
+- Updated strict_json prompt to be f'''\nOutput in the following json template: ```{new_output_format}```
+Update values enclosed in <> and remove the <>. 
+Your response must only be the updated json template beginning with {{ and ending with }}
+Ensure the following output keys are present in the json: {list(new_output_format.keys())}'''
+This will help smaller models like Llama 3 8B generate more reliably.
+- Added explicit mention of output field keys in Agent prompts to aid smaller models
+- Changed get_next_subtask() to output Equipped Function Name instead of Equipped Function for better LLM understanding, and changed prompt to include Observation and Thoughts as well
+- Updated retrieve_by_ranker() in memory.py to only retrieve when the memory items are more than top_k. This helps to save some costs by not performing the retrieval when not needed
+- Fixed some issues with Tutorials with no llm variable, and missing imports
+
 6 Jul 2024 (v3.1.0)
 - Changed Subtask Completed's subtask to be the function name + function params in order to 1) reduce verbosity, 2) make the subtask accurate as it is what is actually done
 - Made prompt to get input parameters of Equipped Function more concise by removing Thoughts and only focusing on Current Subtask

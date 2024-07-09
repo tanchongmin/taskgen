@@ -388,10 +388,10 @@ class Agent(BaseAgent):
         ''' Based on what the task is and the subtasks completed, we get the next subtask, function and input parameters. Supports user-given task as well if user wants to use this function directly'''
         
         if task == '':
-                background_info = f"Assigned Task:```{self.task}```\nSubtasks Completed: ```{self.subtasks_completed}```"
+                background_info = f"Assigned Task:```\n{self.task}\n```\nSubtasks Completed: ```{self.subtasks_completed}```"
 
         else:
-            background_info = f"Assigned Task:```{task}```\n"
+            background_info = f"Assigned Task:```\n{task}\n```\n"
                 
         # use default agent plan if task is not given
         task = self.task if task == '' else task
@@ -407,12 +407,13 @@ class Agent(BaseAgent):
                 rag_info += f'Knowledge Reference for {name}: ```{self.memory_bank[name].retrieve(task)}```\n'
                 
         # First select the Equipped Function
-        res = self.query(query = f'''{background_info}{rag_info}\nBased on everything before, provide the Current Subtask and the corresponding Equipped Function to complete a part of Assigned Task.
-You are only given the Assigned Task from User with no further inputs. Do not do more than required. The last subtask of Assigned Task is End Task''',
+        res = self.query(query = f'''{background_info}{rag_info}\nBased on everything before, provide suitable Observation and Thoughts, and also generate the Current Subtask and the corresponding Equipped Function Name to complete a part of Assigned Task.
+You are only given the Assigned Task from User with no further inputs. Only focus on the Assigned Task and do not do more than required. 
+End Task if Assigned Task is completed.''',
          output_format = {"Observation": "Reflect on what has been done in Subtasks Completed for Assigned Task", 
-                          "Thoughts": "Brainstorm how to complete remainder of Assigned Task only given Observation, End Task if completed", 
+                          "Thoughts": "Brainstorm how to complete remainder of Assigned Task only given Observation", 
                           "Current Subtask": "What to do now in detail with all context provided that can be done by one Equipped Function for Assigned Task", 
-                          "Equipped Function": "Name of Equipped Function to use for Current Subtask"},
+                          "Equipped Function Name": "Name of Equipped Function to use for Current Subtask"},
              provide_function_list = True,
              task = task)
 
@@ -421,19 +422,19 @@ You are only given the Assigned Task from User with no further inputs. Do not do
             print(colored(f"Thoughts: {res['Thoughts']}", 'green', attrs = ['bold']))
             
         # end task if equipped function is incorrect
-        if res["Equipped Function"] not in self.function_map:
-            res["Equipped Function"] = "end_task"
+        if res["Equipped Function Name"] not in self.function_map:
+            res["Equipped Function Name"] = "end_task"
                 
         # If equipped function is use_llm, or end_task, we don't need to do another query
-        cur_function = self.function_map[res["Equipped Function"]]
+        cur_function = self.function_map[res["Equipped Function Name"]]
         
         # Do an additional check to see if we are using code action space
-        if self.code_action and res['Equipped Function'] != 'end_task' and 'python_generate_and_run_code_tool' in self.function_map:
-            res["Equipped Function"] = 'python_generate_and_run_code_tool'
+        if self.code_action and res['Equipped Function Name'] != 'end_task' and 'python_generate_and_run_code_tool' in self.function_map:
+            res["Equipped Function Name"] = 'python_generate_and_run_code_tool'
             res['Equipped Function Inputs'] = {'instruction': res['Current Subtask']}
-        elif res["Equipped Function"] == 'use_llm':
+        elif res["Equipped Function Name"] == 'use_llm':
             res['Equipped Function Inputs'] = {'instruction': res['Current Subtask']}
-        elif res['Equipped Function'] == 'end_task':
+        elif res['Equipped Function Name'] == 'end_task':
             res['Equipped Function Inputs'] = {}   
         # Otherwise, if it is only the instruction, no type check needed, so just take the instruction
         elif len(cur_function.variable_names) == 1 and cur_function.variable_names[0].lower() == "instruction":
@@ -458,14 +459,14 @@ You are only given the Assigned Task from User with no further inputs. Do not do
                 res["Equipped Function Inputs"] = {}
                     
             else:    
-                res2 = self.query(query = f'''{background_info}{rag_info}\n\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for Equipped Function input parameters to fulfil Current Subtask''',
+                res2 = self.query(query = f'''{background_info}{rag_info}\n\nCurrent Subtask: ```{res["Current Subtask"]}```\nEquipped Function Details: ```{str(cur_function)}```\nOutput suitable values for Inputs to Equipped Function to fulfil Current Subtask\nInput fields are: {list(input_format.keys())}''',
                              output_format = input_format,
                              provide_function_list = False)
                 
                 # store the rest of the function parameters
                 res["Equipped Function Inputs"] = res2
             
-        return res["Current Subtask"], res["Equipped Function"], res["Equipped Function Inputs"]
+        return res["Current Subtask"], res["Equipped Function Name"], res["Equipped Function Inputs"]
   
         
     def summarise_subtasks_completed(self, task: str = ''):
@@ -482,11 +483,11 @@ You are only given the Assigned Task from User with no further inputs. Do not do
         
         my_query = self.task if query == '' else query
             
-        res = self.query(query = f'Subtasks Completed: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nRespond to the Assigned Task using information from Global Context and Subtasks Completed only. Be factual and do not generate any new information. Be detailed and give all information available relevant for the Assigned Task.', 
-                                    output_format = {"Response to Assigned Task": "Detailed Response"},
+        res = self.query(query = f'Subtasks Completed: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nRespond to the Assigned Task using information from Global Context and Subtasks Completed only. Be factual and do not generate any new information. Be detailed and give all information available relevant for the Assigned Task in your Assigned Task Response', 
+                                    output_format = {"Assigned Task Response": "Detailed Response"},
                                     provide_function_list = False)
         
-        res = res["Response to Assigned Task"]
+        res = res["Assigned Task Response"]
         
         if self.verbose and verbose:
             print(res)
@@ -1096,10 +1097,10 @@ class AsyncAgent(BaseAgent):
         ''' Based on what the task is and the subtasks completed, we get the next subtask, function and input parameters. Supports user-given task as well if user wants to use this function directly'''
         
         if task == '':
-                background_info = f"Assigned Task:```{self.task}```\nSubtasks Completed: ```{self.subtasks_completed}```"
+                background_info = f"Assigned Task:```\n{self.task}\n```\nSubtasks Completed: ```{self.subtasks_completed}```"
 
         else:
-            background_info = f"Assigned Task:```{task}```\n"
+            background_info = f"Assigned Task:```\n{task}\n```\n"
                 
         # use default agent plan if task is not given
         task = self.task if task == '' else task
@@ -1115,12 +1116,13 @@ class AsyncAgent(BaseAgent):
                 rag_info += f'Knowledge Reference for {name}: ```{await self.memory_bank[name].retrieve(task)}```\n'
                 
         # First select the Equipped Function
-        res = await self.query(query = f'''{background_info}{rag_info}\nBased on everything before, provide the Current Subtask and the corresponding Equipped Function to complete a part of Assigned Task.
-You are only given the Assigned Task from User with no further inputs. Do not do more than required. The last subtask of Assigned Task is End Task''',
+        res = await self.query(query = f'''{background_info}{rag_info}\nBased on everything before, provide suitable Observation and Thoughts, and also generate the Current Subtask and the corresponding Equipped Function Name to complete a part of Assigned Task.
+You are only given the Assigned Task from User with no further inputs. Only focus on the Assigned Task and do not do more than required.
+End Task if Assigned Task is completed.''',
          output_format = {"Observation": "Reflect on what has been done in Subtasks Completed for Assigned Task", 
-                          "Thoughts": "Brainstorm how to complete remainder of Assigned Task only given Observation, End Task if completed", 
+                          "Thoughts": "Brainstorm how to complete remainder of Assigned Task only given Observation", 
                           "Current Subtask": "What to do now in detail with all context provided that can be done by one Equipped Function for Assigned Task", 
-                          "Equipped Function": "Name of Equipped Function to use for Current Subtask"},
+                          "Equipped Function Name": "Name of Equipped Function to use for Current Subtask"},
              provide_function_list = True,
              task = task)
 
@@ -1129,19 +1131,19 @@ You are only given the Assigned Task from User with no further inputs. Do not do
             print(colored(f"Thoughts: {res['Thoughts']}", 'green', attrs = ['bold']))
             
         # end task if equipped function is incorrect
-        if res["Equipped Function"] not in self.function_map:
-            res["Equipped Function"] = "end_task"
+        if res["Equipped Function Name"] not in self.function_map:
+            res["Equipped Function Name"] = "end_task"
                 
         # If equipped function is use_llm, or end_task, we don't need to do another query
-        cur_function = self.function_map[res["Equipped Function"]]
+        cur_function = self.function_map[res["Equipped Function Name"]]
         
         # Do an additional check to see if we should use code
-        if self.code_action and res["Equipped Function"] != 'end_task' and 'python_generate_and_run_code_tool' in self.function_map:
-            res["Equipped Function"] = 'python_generate_and_run_code_tool'
+        if self.code_action and res["Equipped Function Name"] != 'end_task' and 'python_generate_and_run_code_tool' in self.function_map:
+            res["Equipped Function Name"] = 'python_generate_and_run_code_tool'
             res['Equipped Function Inputs'] = {'instruction': res['Current Subtask']}
-        elif res["Equipped Function"] == 'use_llm':
+        elif res["Equipped Function Name"] == 'use_llm':
             res['Equipped Function Inputs'] = {'instruction': res['Current Subtask']}
-        elif res['Equipped Function'] == 'end_task':
+        elif res['Equipped Function Name'] == 'end_task':
             res['Equipped Function Inputs'] = {}
         # Otherwise, if it is only the instruction, no type check needed, so just take the instruction
         elif len(cur_function.variable_names) == 1 and cur_function.variable_names[0].lower() == "instruction":
@@ -1166,14 +1168,14 @@ You are only given the Assigned Task from User with no further inputs. Do not do
                 res["Equipped Function Inputs"] = {}
                     
             else:    
-                res2 = await self.query(query = f'''{background_info}{rag_info}\n\nCurrent Subtask: {res["Current Subtask"]}\nEquipped Function Details: {str(cur_function)}\nOutput suitable values for Equipped Function input parameters to fulfil Current Subtask''',
+                res2 = await self.query(query = f'''{background_info}{rag_info}\n\nCurrent Subtask: ```{res["Current Subtask"]}```\nEquipped Function Details: ```{str(cur_function)}```\Output suitable values for Inputs to Equipped Function to fulfil Current Subtask\nInput fields are: {list(input_format.keys())}''',
                              output_format = input_format,
                              provide_function_list = False)
                 
                 # store the rest of the function parameters
                 res["Equipped Function Inputs"] = res2
             
-        return res["Current Subtask"], res["Equipped Function"], res["Equipped Function Inputs"]
+        return res["Current Subtask"], res["Equipped Function Name"], res["Equipped Function Inputs"]
         
     async def summarise_subtasks_completed(self, task: str = ''):
         ''' Summarise the subtasks_completed list according to task '''
@@ -1189,11 +1191,11 @@ You are only given the Assigned Task from User with no further inputs. Do not do
         
         my_query = self.task if query == '' else query
             
-        res = await self.query(query = f'Subtasks Completed: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nRespond to the Assigned Task in detail using information from Global Context and Subtasks Completed only. Be factual and do not generate any new information. Be detailed and give all information available relevant for the Assigned Task.', 
-                                    output_format = {"Response to Assigned Task": "Detailed Response"},
+        res = await self.query(query = f'Subtasks Completed: ```{self.subtasks_completed}```\nAssigned Task: ```{my_query}```\nRespond to the Assigned Task in detail using information from Global Context and Subtasks Completed only. Be factual and do not generate any new information. Be detailed and give all information available relevant for the Assigned Task in your Assigned Task Response', 
+                                    output_format = {"Assigned Task Response": "Detailed Response"},
                                     provide_function_list = False)
         
-        res = res["Response to Assigned Task"]
+        res = res["Assigned Task Response"]
         
         if self.verbose and verbose:
             print(res)
