@@ -37,7 +37,7 @@ I can't wait to see what this new framework can do for you!
 - StrictJSON helps to ensure all output fields are there and of the right format required for downstream processing
 
 ### Tutorials and Community Support
-- Created: 17 Feb 2024 by John Tan Chong Min
+- Created: 17 Feb 2024 by [John Tan Chong Min](https://www.linkedin.com/in/john-chong-min-tan-94652288/)
 - Co-developer / Lead Contributor: [Prince Saroj](https://www.linkedin.com/in/psaroj/)
 - Collaborators welcome
 - Discussion Channel (my discord - John's AI Group): [https://discord.gg/bzp87AHJy5](https://discord.gg/bzp87AHJy5)
