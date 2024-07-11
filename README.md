@@ -44,7 +44,7 @@ I can't wait to see what this new framework can do for you!
 
 ## How do I use this? 
 1. Download package via command line ```pip install taskgen-ai```
-2. Set up your OpenAPI API Key
+2. Set up your LLM and provide any API keys if needed
 3. Import the required functions from ```taskgen``` and use them!
 
 ## Differences in LLM for Agentic Framework
