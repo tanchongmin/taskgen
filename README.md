@@ -239,7 +239,7 @@ def binary_to_decimal(binary_number: str) -> int:
     return int(str(binary_number), 2)
 
 # Initialise your Agent
-my_agent = AsyncAgent('Helpful assistant', 'You are a generalist agent')
+my_agent = AsyncAgent('Helpful assistant', 'You are a generalist agent', llm = llm_async)
 
 # Assign the functions
 my_agent.assign_functions([sentence_style, binary_to_decimal])
