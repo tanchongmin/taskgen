@@ -1,5 +1,7 @@
 22 Jul 2024 (v3.2.1)
 - Changed all default model parameters in TaskGen Tutorial Notebooks and code to be 'gpt-4o-mini' instead of 'gpt-3.5-turbo' for cheaper and better performance
+- Works with existing notebooks with minimal changes (needed to specify "Only provides cooking guidance" instead of "provides cooking guidance" in agent description of TaskGen Ask Me Anything Notebook to make the reply\_user more factual and related to agent's description)
+- Memory (Tutorial 3) now works perfectly with 'gpt-4o-mini' and not just with 'gpt-4o'
 
 10 Jul 2024 (v3.2.0)
 - Updated strict_json prompt to be f'''\nOutput in the following json template: ```{new_output_format}```
