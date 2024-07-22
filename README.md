@@ -1,4 +1,4 @@
-# TaskGen v3.2.0
+# TaskGen v3.2.1
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 - Video (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
@@ -37,8 +37,8 @@ I can't wait to see what this new framework can do for you!
 - StrictJSON helps to ensure all output fields are there and of the right format required for downstream processing
 
 ### Tutorials and Community Support
-- Created: 17 Feb 2024 by [John Tan Chong Min](https://www.linkedin.com/in/john-chong-min-tan-94652288/)
-- Co-developer / Lead Contributor: [Prince Saroj](https://www.linkedin.com/in/psaroj/)
+- Created: 17 Feb 2024 by John Tan Chong Min
+- Co-developer / Lead Contributor: Prince Saroj
 - Collaborators welcome
 - Discussion Channel (my discord - John's AI Group): [https://discord.gg/bzp87AHJy5](https://discord.gg/bzp87AHJy5)
 
@@ -48,9 +48,10 @@ I can't wait to see what this new framework can do for you!
 3. Import the required functions from ```taskgen``` and use them!
 
 ## Differences in LLM for Agentic Framework
-- ChatGPT (gpt-3.5-turbo) is consistent only if you specify very clearly what you want the Agent to do and give examples of what you want
-- gpt-4-turbo and more advanced models can perform better zero-shot without much examples
-- TaskGen is compatible with ChatGPT and similar models, but for more robust use, consider using gpt-4-turbo and better models
+- Default model is now gpt-4o-mini if you do not specify any LLM!
+- Weaker models like ChatGPT (gpt-3.5-turbo) and Llama 3 8B are consistent only if you specify very clearly what you want the Agent to do and give examples of what you want
+- gpt-4o-mini, gpt-4o, Llama 3 70B and more advanced models can perform better zero-shot without much examples
+- TaskGen is compatible with ChatGPT and similar models, but for more robust use, consider using gpt-4o-mini and better models
 
 # 1. Agent Basics
 - Create an agent by entering your agent's name and description
@@ -64,6 +65,7 @@ I can't wait to see what this new framework can do for you!
     - **agent_description**: String. Short description of what the agent does
     - **max_subtasks**: Int. Default: 5. The maximum number of subtasks the agent can have
     - **verbose**: Bool. Default: True. Whether to print out agent's intermediate thoughts
+    - **llm**: Function. The LLM to be used by the Agent
 <br/><br/>
 
 - **Agent Internal Parameters**:
@@ -86,7 +88,7 @@ I can't wait to see what this new framework can do for you!
     
 ## Example Agent Creation
 ```python
-my_agent = Agent('Helpful assistant', 'You are a generalist agent')
+my_agent = Agent('Helpful assistant', 'You are a generalist agent', llm = llm)
 ```
 
 ## Example Agent Task Running - Split the assigned task into subtasks and execute each of them
@@ -215,7 +217,7 @@ async def llm_async(system_prompt: str, user_prompt: str):
     # define your own LLM here
     client = AsyncOpenAI()
     response = await client.chat.completions.create(
-        model='gpt-3.5-turbo',
+        model='gpt-4o-mini',
         temperature = 0,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -239,7 +241,7 @@ def binary_to_decimal(binary_number: str) -> int:
     return int(str(binary_number), 2)
 
 # Initialise your Agent
-my_agent = AsyncAgent('Helpful assistant', 'You are a generalist agent', llm = llm_async)
+my_agent = AsyncAgent('Helpful assistant', 'You are a generalist agent')
 
 # Assign the functions
 my_agent.assign_functions([sentence_style, binary_to_decimal])
@@ -326,8 +328,8 @@ agent = Agent('Inventory Manager',
 - These extend the baseline features of TaskGen and you are encouraged to take a look at the Tutorials for more information.
 
 # Known Limitations
-- `gpt-3.5-turbo` is not that great with mathematical functions for Agents. Use `gpt-4-turbo` or better for more consistent results
-- `gpt-3.5-turbo` is not that great with Memory (Tutorial 3). Use `gpt-4-turbo` or better for more consistent results
+- `gpt-3.5-turbo` is not that great with mathematical functions for Agents. Use `gpt-4o-mini` or better for more consistent results
+- `gpt-3.5-turbo` is not that great with Memory (Tutorial 3). Use `gpt-4o-mini` or better for more consistent results
 
 # Contributing to the project
 
