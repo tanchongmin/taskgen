@@ -1,3 +1,7 @@
+25 Jul 2024 (v3.3.1)
+- Fixed a missing filter for strict_json_async to get only the text within {} for json
+- Added a MemoryTemplate in memory.py, to serve as foundation for VectorDBMemory and GraphMemory
+
 25 Jul 2024 (v3.3.0)
 - For strict_json, changed the output to be f'''\nOutput in the following json template: ```{new_output_format}```
 Update values enclosed in <> and remove the <>. 

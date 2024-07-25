@@ -309,6 +309,8 @@ Ensure the following output keys are present in the json: {' '.join(list(new_out
                 res = res + '}'
                 endindex = len(res) - 1
                 
+            res = res[startindex: endindex+1]
+
             # try-catch block to ensure output format is adhered to
             try:
                 # check that res is a json string

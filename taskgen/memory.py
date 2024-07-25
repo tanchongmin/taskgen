@@ -6,15 +6,42 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 import copy
 
 import pandas as pd
+from abc import ABC, abstractmethod
+
 from taskgen.base import strict_json
 from taskgen.base_async import strict_json_async
 
 from taskgen.ranker import AsyncRanker, Ranker
 from taskgen.utils import ensure_awaitable, get_source_code_for_func, top_k_index
 
+class MemoryTemplate(ABC):
+    ''' A generic template provided for all memories '''
 
-class BaseMemory:
-    ''' Retrieves top k memory items based on task 
+    @abstractmethod
+    def append(self, new_memory):
+        ''' Appends a new_memory. new_memory can be str, or triplet if it is a Knowledge Graph '''
+        pass
+    
+    @abstractmethod
+    def remove(self, existing_memory):
+        ''' Removes an existing_memory. existing_memory can be str, or triplet if it is a Knowledge Graph '''
+        pass
+    
+    @abstractmethod
+    def reset(self):
+        ''' Clears all memories '''
+
+    @abstractmethod
+    def retrieve(self, task: str):
+        ''' Retrieves some memories according to task '''
+        pass
+    
+## TODO: Implement VectorDBMemory and GraphMemory Class that use MemoryTemplate
+    
+    
+### BaseMemory will be legacy once VectorDBMemory and GraphMemory Classes are created
+class BaseMemory(MemoryTemplate):
+    ''' Retrieves top k memory items based on task. This is an in-house, unoptimised, vector db
     - Inputs:
         - `memory`: List. Default: None. The list containing the memory items
         - `top_k`: Int. Default: 3. The number of memory list items to retrieve
@@ -23,7 +50,7 @@ class BaseMemory:
         - `approach`: str. Either `retrieve_by_ranker` or `retrieve_by_llm` to retrieve memory items
             - Ranker is faster and cheaper as it compares via embeddings, but are inferior to LLM-based methods for contextual information
         - `llm`: Function. The llm to use for `strict_json` llm retriever
-        - `retrieve_fn`: Default: None. Takes in task and outputs top_k similar memories in a list
+        - `retrieve_fn`: Default: None. Takes in task and outputs top_k similar memories in a list. Does away with the Ranker() altogether
         - `ranker`: `Ranker`. The Ranker which defines a similarity score between a query and a key. Default: OpenAI `text-embedding-3-small` model. 
             - Can be replaced with a function which returns similarity score from 0 to 1 when given a query and key
      '''
