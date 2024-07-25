@@ -1,3 +1,14 @@
+25 Jul 2024 (v3.3.0)
+- For strict_json, changed the output to be f'''\nOutput in the following json template: ```{new_output_format}```
+Update values enclosed in <> and remove the <>. 
+Your response must only be the updated json template beginning with {{ and ending with }}
+Ensure the following output keys are present in the json: {' '.join(list(new_output_format.keys()))}'''
+
+This helps by changing ['###key###'] into ###key### , which helps Llama 3 8B better understand how to format the json
+
+- Fixed an error with assign_functions() when assigning Inner Agents, as it assigns the Meta Agent instead of the Inner Agent inside this function
+- Updated Inner Agent in shared variables under 'agent' for Inner Agent calls
+
 22 Jul 2024 (v3.2.1)
 - Changed all default model parameters in TaskGen Tutorial Notebooks and code to be 'gpt-4o-mini' instead of 'gpt-3.5-turbo' for cheaper and better performance
 - Works with existing notebooks with minimal changes (needed to specify "Only provides cooking guidance" instead of "provides cooking guidance" in agent description of TaskGen Ask Me Anything Notebook to make the reply\_user more factual and related to agent's description)

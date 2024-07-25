@@ -289,7 +289,7 @@ async def strict_json_async(system_prompt: str, user_prompt: str, output_format:
         output_format_prompt = f'''\nOutput in the following json template: ```{new_output_format}```
 Update values enclosed in <> and remove the <>. 
 Your response must only be the updated json template beginning with {{ and ending with }}
-Ensure the following output keys are present in the json: {list(new_output_format.keys())}'''
+Ensure the following output keys are present in the json: {' '.join(list(new_output_format.keys()))}'''
 
         for i in range(num_tries):
             my_system_prompt = str(system_prompt) + output_format_prompt + error_msg

@@ -294,7 +294,7 @@ class Agent(BaseAgent):
         for function in function_list:
             # If this function is an Agent, parse it accordingly
             if isinstance(function, BaseAgent):
-                function = self.to_function(self)
+                function = function.to_function(self)
             
             # do automatic conversion of function to Function class (this is in base.py)
             if not isinstance(function, Function):
@@ -1002,7 +1002,7 @@ class AsyncAgent(BaseAgent):
         for function in function_list:
             # If this function is an Agent, parse it accordingly
             if isinstance(function, BaseAgent):
-                function = self.to_function(self)
+                function = function.to_function(self)
                 
             # do automatic conversion of function to Function class (this is in base.py)
             if not isinstance(function, AsyncFunction):
@@ -1290,6 +1290,10 @@ End Task if Assigned Task is completed.''',
     use_tool = use_function
     assign_agent = assign_agents
     
+###########################################
+### This is to wrap Agents as Functions ###
+###########################################
+    
 class Base_Agent_External_Function:
     ''' Creates a Function-based version of the agent '''
     def __init__(self, agent: Agent, meta_agent: Agent):
@@ -1305,8 +1309,8 @@ class Agent_External_Function(Base_Agent_External_Function):
         
 
     def __call__(self, instruction: str):
-        ''' Calls the inner agent to perform an instruction. The outcome of the agent goes directly into subtasks_completed
-        No need for return values '''
+        ''' Calls the Inner Agent to perform an instruction. The outcome of the agent goes directly into subtasks_completed
+        Returns the Inner Agent's reply '''
         # make a deep copy so we do not affect the original agent
         if self.agent.verbose:
             print(f'\n### Start of Inner Agent: {self.agent.agent_name} ###')
@@ -1314,6 +1318,7 @@ class Agent_External_Function(Base_Agent_External_Function):
         
         # take the shared variables from the meta agent
         agent_copy.shared_variables = self.meta_agent.shared_variables
+        agent_copy.shared_variables['agent'] = agent_copy
         
         # provide the subtasks completed and debug capabilities to the inner agents too
         agent_copy.reset()
@@ -1332,6 +1337,9 @@ class Agent_External_Function(Base_Agent_External_Function):
             print(colored(f'###\nReply from {self.agent.agent_name} to {self.meta_agent.agent_name}:\n{agent_reply}\n###\n', 'magenta', attrs = ['bold']))
             print(f'### End of Inner Agent: {self.agent.agent_name} ###\n')
             
+        # sets back the original agent in shared variables
+        self.meta_agent.shared_variables['agent'] = self.meta_agent
+            
         return agent_reply
 
 class Async_Agent_External_Function(Base_Agent_External_Function):
@@ -1343,8 +1351,8 @@ class Async_Agent_External_Function(Base_Agent_External_Function):
         
 
     async def __call__(self, instruction: str):
-        ''' Calls the inner agent to perform an instruction. The outcome of the agent goes directly into subtasks_completed
-        No need for return values '''
+        ''' Calls the Inner Agent to perform an instruction. The outcome of the agent goes directly into subtasks_completed
+        Returns the Inner Agent's reply '''
         # make a deep copy so we do not affect the original agent
         if self.agent.verbose:
             print(f'\n### Start of Inner Agent: {self.agent.agent_name} ###')
@@ -1352,6 +1360,7 @@ class Async_Agent_External_Function(Base_Agent_External_Function):
         
         # take the shared variables from the meta agent
         agent_copy.shared_variables = self.meta_agent.shared_variables
+        agent_copy.shared_variables['agent'] = agent_copy
         
         # provide the subtasks completed and debug capabilities to the inner agents too
         agent_copy.reset()
@@ -1369,6 +1378,9 @@ class Async_Agent_External_Function(Base_Agent_External_Function):
         if self.agent.verbose:
             print(colored(f'###\nReply from {self.agent.agent_name} to {self.meta_agent.agent_name}:\n{agent_reply}\n###\n', 'magenta', attrs = ['bold']))
             print(f'### End of Inner Agent: {self.agent.agent_name} ###\n')
+            
+        # sets back the original agent in shared variables
+        self.meta_agent.shared_variables['agent'] = self.meta_agent
             
         return agent_reply
     
