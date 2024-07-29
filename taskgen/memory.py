@@ -7,9 +7,7 @@ import PyPDF2
 from docx import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import chromadb
-from chromadb.utils.embedding_functions.openai_embedding_function import (
-    OpenAIEmbeddingFunction,
-)
+from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 import copy
 from openai import AsyncOpenAI, OpenAI
 
@@ -81,9 +79,7 @@ class AsyncMemoryTemplate(ABC):
         """Retrieves some memories according to task asynchronously"""
         pass
 
-
-# TODO add chromadb dependency
-class BaseChromaDbMemory(ABC):
+class BaseChromaDbMemory(MemoryTemplate):
     def __init__(
         self,
         client=None,
@@ -414,9 +410,7 @@ class AsyncMemory(BaseMemory):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.ranker is None:
-            self.ranker = (
-                AsyncRanker()
-            )  # Assuming Ranker needs to be initialized if not provided
+            self.ranker = AsyncRanker() # Assuming Ranker needs to be initialized if not provided
         if not isinstance(self.ranker, AsyncRanker):
             raise Exception("Sync Ranker not allowed in AsyncMemory")
         ensure_awaitable(self.retrieve_fn, "retrieve_fn")
