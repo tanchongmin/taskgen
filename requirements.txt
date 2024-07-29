@@ -7,3 +7,4 @@ PyPDF2
 python-docx
 pandas
 xlrd
+chromadb
