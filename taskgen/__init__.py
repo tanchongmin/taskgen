@@ -20,6 +20,7 @@ __all__ = [
     "ConversableAgent",
     "AsyncRanker",
     "Memory",
+    "MemoryTemplate",
     "AsyncMemory",
     "ChromaDbMemory",
     "AsyncChromaDbMemory",

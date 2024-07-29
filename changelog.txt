@@ -1,3 +1,6 @@
+29 Jul 2024 (v3.3.2)
+- Added ChromaDB Memory to use VectorDB for insertion and retrieval of memories (credit: Prince Saroj)
+
 25 Jul 2024 (v3.3.1)
 - Fixed a missing filter for strict_json_async to get only the text within {} for json
 - Added a MemoryTemplate in memory.py, to serve as foundation for VectorDBMemory and GraphMemory
