@@ -51,35 +51,7 @@ class MemoryTemplate(ABC):
         pass
 
 
-class AsyncMemoryTemplate(ABC):
-    """An asynchronous template for all memories"""
-
-    @abstractmethod
-    async def bulk_add(self, new_memories, metadatas):
-        """Appends multiple new memories asynchronously"""
-        pass
-
-    @abstractmethod
-    async def append(self, new_memory, metadata):
-        """Appends a new_memory asynchronously. new_memory can be str, or triplet if it is a Knowledge Graph"""
-        pass
-
-    @abstractmethod
-    async def remove(self, existing_memory):
-        """Removes an existing_memory asynchronously. existing_memory can be str, or triplet if it is a Knowledge Graph"""
-        pass
-
-    @abstractmethod
-    async def reset(self):
-        """Clears all memories asynchronously"""
-        pass
-
-    @abstractmethod
-    async def retrieve(self, task: str):
-        """Retrieves some memories according to task asynchronously"""
-        pass
-
-class BaseChromaDbMemory(MemoryTemplate):
+class BaseChromaDbMemory(MemoryTemplate, ABC):
     def __init__(
         self,
         client=None,
@@ -120,6 +92,14 @@ class BaseChromaDbMemory(MemoryTemplate):
         return self.collection.query(
             query_texts=[task], n_results=self.top_k, where=filter
         )
+
+    @abstractmethod
+    def bulk_add(self, new_memories: list[str], metadatas: list[dict] = None):
+        pass
+
+    @abstractmethod
+    def append(self, new_memory, metadata=None):
+        pass
 
 
 class ChromaDbMemory(BaseChromaDbMemory):
