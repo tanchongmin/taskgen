@@ -2,11 +2,14 @@ from ast import List
 import asyncio
 import hashlib
 import os
+import time
 from typing import Any
 import PyPDF2
 from docx import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import chromadb
+from chromadb.api.async_client import AsyncClient
+from chromadb.api.client import Client
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 import copy
 from openai import AsyncOpenAI, OpenAI
@@ -25,14 +28,13 @@ class MemoryTemplate(ABC):
     """A generic template provided for all memories"""
 
     @abstractmethod
-    def bulk_add(self, new_memories, metadatas):
+    def append(self, memory_list, mapper=None):
         """Appends multiple new memories"""
         pass
 
-    # Todo Discuss with John on whether to keep this or not or rely completely on bulk_add
     @abstractmethod
-    def append(self, new_memory, metadata):
-        """Appends a new_memory. new_memory can be str, or triplet if it is a Knowledge Graph"""
+    def append_memory_list(self, new_memories, metadatas):
+        """Appends a list of new memories"""
         pass
 
     # TODO Should this be deleted based on metadata key - value filter
@@ -50,6 +52,58 @@ class MemoryTemplate(ABC):
         """Retrieves some memories according to task"""
         pass
 
+    @abstractmethod
+    def add_file(self, filepath, text_splitter=None):
+        """Adds a file to the memory"""
+        pass
+
+    def read_file(self, filepath, text_splitter=None):
+        if ".xls" in filepath:
+            text = pd.read_excel(filepath).to_string()
+        elif ".csv" in filepath:
+            text = pd.read_csv(filepath).to_string()
+        elif ".docx" in filepath:
+            text = self.read_docx(filepath)
+        elif ".pdf" in filepath:
+            text = self.read_pdf(filepath)
+        else:
+            raise ValueError(
+                "File type not spported, supported file types: pdf, docx, csv, xls"
+            )
+
+        if not text_splitter:
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=500,
+                chunk_overlap=100,
+                length_function=len,
+                is_separator_regex=False,
+                separators=[".\n", "\n"],
+            )
+
+        texts = text_splitter.split_text(text)
+        memories = [{"content": text, "filepath": filepath} for text in texts]
+        return memories
+
+    def read_pdf(self, filepath):
+        # Open the PDF file
+        text_list = []
+        with open(filepath, "rb") as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            for page in pdf_reader.pages:
+                page_text = page.extract_text()
+                if page_text:  # Ensure there's text on the page
+                    text_list.append(page_text)
+                else:
+                    print("No text found on page")
+        return "\n".join(text_list)
+
+    def read_docx(self, filepath):
+        doc = Document(filepath)
+        text_list = []
+        for para in doc.paragraphs:
+            text_list.append(para.text)
+        return "\n".join(text_list)
+
 
 class BaseChromaDbMemory(MemoryTemplate, ABC):
     def __init__(
@@ -58,6 +112,7 @@ class BaseChromaDbMemory(MemoryTemplate, ABC):
         collection_name="taskgen-chroma",
         embedding_model="text-embedding-3-small",
         top_k=3,
+        mapper=lambda x: x,
     ):
         # Evaluate async client for chroma db for storage
         self.client = client or chromadb.PersistentClient()
@@ -66,9 +121,14 @@ class BaseChromaDbMemory(MemoryTemplate, ABC):
         self.embedding_function = OpenAIEmbeddingFunction(
             api_key=os.environ.get("OPENAI_API_KEY"), model_name=self.embedding_model
         )
-        self.collection = self.client.get_or_create_collection(
-            collection_name, embedding_function=self.embedding_function
-        )
+        self.salt = os.urandom(16).hex()
+        self.collection_name = collection_name
+        self.mapper = mapper
+        self.collection = None
+        if isinstance(self.client, Client):
+            self.collection = self.client.get_or_create_collection(
+                self.collection_name, embedding_function=self.embedding_function
+            )
 
     @abstractmethod
     def get_openai_client(self):
@@ -78,37 +138,58 @@ class BaseChromaDbMemory(MemoryTemplate, ABC):
     def create_embedding(self, text):
         pass
 
-    def remove(self, ids):
-        self.collection.delete(ids)
+    @abstractmethod
+    def get_or_create_collection(self):
+        pass
+
+    def remove(self, memories: list[str]):
+        for memory in memories:
+            retrieved_ = self.collection.query(
+                query_texts=[memory], n_results=self.top_k
+            )
+            retrieved_id = retrieved_["ids"][0][0]
+            retrieved_distance = retrieved_["distances"][0][0]
+            if retrieved_distance < 0.001:
+                self.collection.delete([retrieved_id])
+        return True
+
+    def remove_by_id(self, ids):
+        if not isinstance(ids, list):
+            ids = [ids]
+        return self.collection.delete(ids)
 
     def generate_id(self, embedding):
-        # Generate a unique ID based on the embedding
-        return hashlib.md5(str(embedding).encode()).hexdigest()
+        # Generate a unique ID based on the embedding with added salt
+        current_time = str(time.time()).encode()
+        salted_embedding = str(embedding).encode() + self.salt.encode() + current_time
+        return hashlib.sha256(salted_embedding).hexdigest()
 
     def reset(self):
-        raise NotImplementedError("Reset function not implemented yet")
+        return self.client.delete_collection(name=self.collection.name)
 
     def retrieve(self, task: str, filter=[]):
         return self.collection.query(
             query_texts=[task], n_results=self.top_k, where=filter
         )
 
-    @abstractmethod
-    def bulk_add(self, new_memories: list[str], metadatas: list[dict] = None):
-        pass
-
-    @abstractmethod
-    def append(self, new_memory, metadata=None):
-        pass
-
 
 class ChromaDbMemory(BaseChromaDbMemory):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.openai_client = self.get_openai_client()
+        self.collection = self.get_or_create_collection()
 
     def get_openai_client(self):
         return OpenAI()
+
+    def get_or_create_collection(self):
+        return self.client.get_or_create_collection(
+            self.collection_name, embedding_function=self.embedding_function
+        )
+
+    def add_file(self, filepath, text_splitter=None):
+        new_memories = self.read_file(filepath, text_splitter)
+        return self.append(new_memories, mapper=lambda x: x["content"])
 
     def create_embedding(self, text):
         return (
@@ -119,7 +200,21 @@ class ChromaDbMemory(BaseChromaDbMemory):
             .embedding
         )
 
-    def bulk_add(self, new_memories: list[str], metadatas: list[dict] = None):
+    def append(self, new_memories, mapper=None):
+        if not isinstance(new_memories, list):
+            new_memories = [new_memories]
+
+        if mapper:
+            memory_strings = [mapper(memory) for memory in new_memories]
+        else:
+            memory_strings = [self.mapper(memory) for memory in new_memories]
+        if all(isinstance(item, dict) for item in new_memories):
+            metadatas = new_memories
+        else:
+            metadatas = [{"content": item} for item in new_memories]
+        return self.append_memory_list(memory_strings, metadatas)
+
+    def append_memory_list(self, new_memories: list[str], metadatas: list[dict] = None):
         embeddings = [self.create_embedding(text) for text in new_memories]
         if metadatas is None:
             metadatas = [{} for _ in new_memories]
@@ -127,19 +222,11 @@ class ChromaDbMemory(BaseChromaDbMemory):
             metadata.get("id") or self.generate_id(embedding)
             for metadata, embedding in zip(metadatas, embeddings)
         ]
-        self.collection.upsert(
+        return self.collection.upsert(
             ids=ids,
             embeddings=embeddings,
             documents=new_memories,
             metadatas=metadatas,
-        )
-
-    def append(self, new_memory, metadata=None):
-        self.collection.upsert(
-            ids=[metadata["id"] or self.generate_id(new_memory)],
-            embeddings=[self.create_embedding(new_memory)],
-            documents=[new_memory],
-            metadatas=[metadata],
         )
 
 
@@ -151,13 +238,45 @@ class AsyncChromaDbMemory(BaseChromaDbMemory):
     def get_openai_client(self):
         return AsyncOpenAI()
 
+    async def get_or_create_collection(self):
+        if self.collection:
+            return self.collection
+        if isinstance(self.client, Client):
+            return self.client.get_or_create_collection(
+                self.collection_name, embedding_function=self.embedding_function
+            )
+        elif isinstance(self.client, AsyncClient):
+            return await self.client.get_or_create_collection(
+                self.collection_name, embedding_function=self.embedding_function
+            )
+
+    async def add_file(self, filepath, text_splitter=None):
+        new_memories = self.read_file(filepath, text_splitter)
+        return await self.append(new_memories, mapper=lambda x: x["content"])
+
     async def create_embedding(self, text):
         embedding = await self.openai_client.embeddings.create(
             input=[text], model=self.embedding_model
         )
         return embedding.data[0].embedding
 
-    async def bulk_add(self, new_memories: list[str], metadatas: list[dict] = None):
+    async def append(self, new_memories=[], mapper=None):
+        if not isinstance(new_memories, list):
+            new_memories = [new_memories]
+        if mapper:
+            memory_strings = [mapper(memory) for memory in new_memories]
+        else:
+            memory_strings = [self.mapper(memory) for memory in new_memories]
+        if all(isinstance(item, dict) for item in new_memories):
+            metadatas = new_memories
+        else:
+            metadatas = [{"content": item} for item in new_memories]
+        return await self.append_memory_list(memory_strings, metadatas)
+
+    async def append_memory_list(
+        self, new_memories: list[str], metadatas: list[dict] = None
+    ):
+        self.collection = await self.get_or_create_collection()
         embeddings = await asyncio.gather(
             *[self.create_embedding(text) for text in new_memories]
         )
@@ -167,29 +286,62 @@ class AsyncChromaDbMemory(BaseChromaDbMemory):
             metadata.get("id") or self.generate_id(embedding)
             for metadata, embedding in zip(metadatas, embeddings)
         ]
-        self.collection.upsert(
-            ids=ids,
-            embeddings=embeddings,
-            documents=new_memories,
-            metadatas=metadatas,
-        )
+        if isinstance(self.client, AsyncClient):
+            return await self.collection.upsert(
+                ids=ids,
+                embeddings=embeddings,
+                documents=new_memories,
+                metadatas=metadatas,
+            )
+        elif isinstance(self.client, Client):
+            return self.collection.upsert(
+                ids=ids,
+                embeddings=embeddings,
+                documents=new_memories,
+                metadatas=metadatas,
+            )
+        else:
+            raise Exception("Unknown client type")
 
-    async def append(self, new_memory, metadata=None):
-        embedding = await self.create_embedding(new_memory)
-        self.collection.upsert(
-            ids=[metadata["id"]] or self.generate_id(embedding),
-            embeddings=[embedding],
-            documents=[new_memory],
-            metadatas=[metadata],
-        )
+    async def remove(self, memories: list[str]):
+        self.collection = await self.get_or_create_collection()
+        if isinstance(self.client, AsyncClient):
 
-    async def remove(self, ids=[]):
-        super().remove(ids)
+            retrieved = await asyncio.gather(
+                *[self.retrieve(memory) for memory in memories]
+            )
+            retrieved_distances = [r["distances"][0][0] for r in retrieved]
+            retrieved_ids = [r["ids"][0][0] for r in retrieved]
+            ids_to_remove = [
+                retrieved_id
+                for retrieved_id, retrieved_distance in zip(
+                    retrieved_ids, retrieved_distances
+                )
+                if retrieved_distance < 0.001
+            ]
+            return await self.remove_by_id(ids_to_remove)
+        else:
+            return super().remove(memories)
+
+    async def remove_by_id(self, ids=[]):
+        self.collection = await self.get_or_create_collection()
+        if isinstance(self.client, AsyncClient):
+            return await self.collection.delete(ids)
+        else:
+            return super().remove(ids)
 
     async def reset(self):
-        super().reset()
+        self.collection = await self.get_or_create_collection()
+        if isinstance(self.client, AsyncClient):
+            return await self.client.delete_collection(name=self.collection.name)
+        return super().reset()
 
     async def retrieve(self, task: str, filter=[]):
+        self.collection = await self.get_or_create_collection()
+        if isinstance(self.client, AsyncClient):
+            return await self.collection.query(
+                query_texts=[task], n_results=self.top_k, where=filter
+            )
         return super().retrieve(task, filter)
 
 
@@ -233,60 +385,19 @@ class BaseMemory(MemoryTemplate):
         self.retrieve_fn = retrieve_fn
         self.llm = llm
 
-    def append(self, new_memory):
-        """Adds a new_memory"""
-        self.memory.append(new_memory)
-
     def add_file(self, filepath, text_splitter=None):
-        if ".xls" in filepath:
-            text = pd.read_excel(filepath).to_string()
-        elif ".csv" in filepath:
-            text = pd.read_csv(filepath).to_string()
-        elif ".docx" in filepath:
-            text = self.read_docx(filepath)
-        elif ".pdf" in filepath:
-            text = self.read_pdf(filepath)
-        else:
-            raise ValueError(
-                "File type not spported, supported file types: pdf, docx, csv, xls"
-            )
-        if not text_splitter:
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=500,
-                chunk_overlap=100,
-                length_function=len,
-                is_separator_regex=False,
-                separators=[".\n", "\n"],
-            )
+        memories = self.read_file(filepath, text_splitter)
+        texts = [memory["content"] for memory in memories]
+        self.append(texts)
 
-        texts = text_splitter.split_text(text)
-        self.memory.extend(texts)
-
-    def read_pdf(self, filepath):
-        # Open the PDF file
-        text_list = []
-        with open(filepath, "rb") as file:
-            pdf_reader = PyPDF2.PdfReader(file)
-            for page in pdf_reader.pages:
-                page_text = page.extract_text()
-                if page_text:  # Ensure there's text on the page
-                    text_list.append(page_text)
-                else:
-                    print("No text found on page")
-        return "\n".join(text_list)
-
-    def read_docx(self, filepath):
-        doc = Document(filepath)
-        text_list = []
-        for para in doc.paragraphs:
-            text_list.append(para.text)
-        return "\n".join(text_list)
-
-    def extend(self, memory_list: list):
+    def append(self, memory_list, mapper=None):
         """Adds a list of memories"""
         if not isinstance(memory_list, list):
-            memory_list = list(memory_list)
+            memory_list = [memory_list]
         self.memory.extend(memory_list)
+
+    def append_memory_list(self, new_memories, metadatas):
+        raise NotImplementedError("Not implemented, use append instead")
 
     def remove(self, memory_to_remove):
         """Removes a memory"""
@@ -368,9 +479,6 @@ class Memory(BaseMemory):
         top_k_indices = res[f"top_{self.top_k}_list"]
         return [self.memory[index] for index in top_k_indices]
 
-    def bulk_add(self, new_memories, metadatas):
-        raise NotImplementedError("Bulk add not implemented for AsyncMemory")
-
 
 class AsyncMemory(BaseMemory):
     """Retrieves top k memory items based on task
@@ -390,7 +498,9 @@ class AsyncMemory(BaseMemory):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.ranker is None:
-            self.ranker = AsyncRanker() # Assuming Ranker needs to be initialized if not provided
+            self.ranker = (
+                AsyncRanker()
+            )  # Assuming Ranker needs to be initialized if not provided
         if not isinstance(self.ranker, AsyncRanker):
             raise Exception("Sync Ranker not allowed in AsyncMemory")
         ensure_awaitable(self.retrieve_fn, "retrieve_fn")
@@ -437,6 +547,3 @@ class AsyncMemory(BaseMemory):
         )
         top_k_indices = res[f"top_{self.top_k}_list"]
         return [self.memory[index] for index in top_k_indices]
-
-    async def bulk_add(self, new_memories, metadatas):
-        raise NotImplementedError("Bulk add not implemented for AsyncMemory")
