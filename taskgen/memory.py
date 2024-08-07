@@ -12,7 +12,6 @@ from chromadb.api.async_client import AsyncClient
 from chromadb.api.client import Client
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 import copy
-from openai import AsyncOpenAI, OpenAI
 
 import pandas as pd
 from abc import ABC, abstractmethod
@@ -23,6 +22,9 @@ from taskgen.base_async import strict_json_async
 from taskgen.ranker import AsyncRanker, Ranker
 from taskgen.utils import ensure_awaitable, get_source_code_for_func, top_k_index
 
+###################
+## Base Template ##
+###################
 
 class MemoryTemplate(ABC):
     """A generic template provided for all memories"""
@@ -30,11 +32,6 @@ class MemoryTemplate(ABC):
     @abstractmethod
     def append(self, memory_list, mapper=None):
         """Appends multiple new memories"""
-        pass
-
-    @abstractmethod
-    def append_memory_list(self, new_memories, metadatas):
-        """Appends a list of new memories"""
         pass
 
     # TODO Should this be deleted based on metadata key - value filter
@@ -104,251 +101,12 @@ class MemoryTemplate(ABC):
             text_list.append(para.text)
         return "\n".join(text_list)
 
+########################
+## In-house vector db ##
+########################
 
-class BaseChromaDbMemory(MemoryTemplate, ABC):
-    def __init__(
-        self,
-        client=None,
-        collection_name="taskgen-chroma",
-        embedding_model="text-embedding-3-small",
-        top_k=3,
-        mapper=lambda x: x,
-    ):
-        # Evaluate async client for chroma db for storage
-        self.client = client or chromadb.PersistentClient()
-        self.embedding_model = embedding_model
-        self.top_k = top_k
-        self.embedding_function = OpenAIEmbeddingFunction(
-            api_key=os.environ.get("OPENAI_API_KEY"), model_name=self.embedding_model
-        )
-        self.salt = os.urandom(16).hex()
-        self.collection_name = collection_name
-        self.mapper = mapper
-        self.collection = None
-        if isinstance(self.client, Client):
-            self.collection = self.client.get_or_create_collection(
-                self.collection_name, embedding_function=self.embedding_function
-            )
+### BaseMemory is VectorDB that is natively implemented, but not optimised. This will be used for function-based RAG and other kinds of RAG that are not natively text-based. For more optimised memory, check out ChromaDbMemory
 
-    @abstractmethod
-    def get_openai_client(self):
-        pass
-
-    @abstractmethod
-    def create_embedding(self, text):
-        pass
-
-    @abstractmethod
-    def get_or_create_collection(self):
-        pass
-
-    def remove(self, memories: list[str]):
-        for memory in memories:
-            retrieved_ = self.collection.query(
-                query_texts=[memory], n_results=self.top_k
-            )
-            retrieved_id = retrieved_["ids"][0][0]
-            retrieved_distance = retrieved_["distances"][0][0]
-            if retrieved_distance < 0.001:
-                self.collection.delete([retrieved_id])
-        return True
-
-    def remove_by_id(self, ids):
-        if not isinstance(ids, list):
-            ids = [ids]
-        return self.collection.delete(ids)
-
-    def generate_id(self, embedding):
-        # Generate a unique ID based on the embedding with added salt
-        current_time = str(time.time()).encode()
-        salted_embedding = str(embedding).encode() + self.salt.encode() + current_time
-        return hashlib.sha256(salted_embedding).hexdigest()
-
-    def reset(self):
-        return self.client.delete_collection(name=self.collection.name)
-
-    def retrieve(self, task: str, filter=[]):
-        return self.collection.query(
-            query_texts=[task], n_results=self.top_k, where=filter
-        )
-
-
-class ChromaDbMemory(BaseChromaDbMemory):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.openai_client = self.get_openai_client()
-        self.collection = self.get_or_create_collection()
-
-    def get_openai_client(self):
-        return OpenAI()
-
-    def get_or_create_collection(self):
-        return self.client.get_or_create_collection(
-            self.collection_name, embedding_function=self.embedding_function
-        )
-
-    def add_file(self, filepath, text_splitter=None):
-        new_memories = self.read_file(filepath, text_splitter)
-        return self.append(new_memories, mapper=lambda x: x["content"])
-
-    def create_embedding(self, text):
-        return (
-            self.openai_client.embeddings.create(
-                input=[text], model=self.embedding_model
-            )
-            .data[0]
-            .embedding
-        )
-
-    def append(self, new_memories, mapper=None):
-        if not isinstance(new_memories, list):
-            new_memories = [new_memories]
-
-        if mapper:
-            memory_strings = [mapper(memory) for memory in new_memories]
-        else:
-            memory_strings = [self.mapper(memory) for memory in new_memories]
-        if all(isinstance(item, dict) for item in new_memories):
-            metadatas = new_memories
-        else:
-            metadatas = [{"content": item} for item in new_memories]
-        return self.append_memory_list(memory_strings, metadatas)
-
-    def append_memory_list(self, new_memories: list[str], metadatas: list[dict] = None):
-        embeddings = [self.create_embedding(text) for text in new_memories]
-        if metadatas is None:
-            metadatas = [{} for _ in new_memories]
-        ids = [
-            metadata.get("id") or self.generate_id(embedding)
-            for metadata, embedding in zip(metadatas, embeddings)
-        ]
-        return self.collection.upsert(
-            ids=ids,
-            embeddings=embeddings,
-            documents=new_memories,
-            metadatas=metadatas,
-        )
-
-
-class AsyncChromaDbMemory(BaseChromaDbMemory):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.openai_client = self.get_openai_client()
-
-    def get_openai_client(self):
-        return AsyncOpenAI()
-
-    async def get_or_create_collection(self):
-        if self.collection:
-            return self.collection
-        if isinstance(self.client, Client):
-            return self.client.get_or_create_collection(
-                self.collection_name, embedding_function=self.embedding_function
-            )
-        elif isinstance(self.client, AsyncClient):
-            return await self.client.get_or_create_collection(
-                self.collection_name, embedding_function=self.embedding_function
-            )
-
-    async def add_file(self, filepath, text_splitter=None):
-        new_memories = self.read_file(filepath, text_splitter)
-        return await self.append(new_memories, mapper=lambda x: x["content"])
-
-    async def create_embedding(self, text):
-        embedding = await self.openai_client.embeddings.create(
-            input=[text], model=self.embedding_model
-        )
-        return embedding.data[0].embedding
-
-    async def append(self, new_memories=[], mapper=None):
-        if not isinstance(new_memories, list):
-            new_memories = [new_memories]
-        if mapper:
-            memory_strings = [mapper(memory) for memory in new_memories]
-        else:
-            memory_strings = [self.mapper(memory) for memory in new_memories]
-        if all(isinstance(item, dict) for item in new_memories):
-            metadatas = new_memories
-        else:
-            metadatas = [{"content": item} for item in new_memories]
-        return await self.append_memory_list(memory_strings, metadatas)
-
-    async def append_memory_list(
-        self, new_memories: list[str], metadatas: list[dict] = None
-    ):
-        self.collection = await self.get_or_create_collection()
-        embeddings = await asyncio.gather(
-            *[self.create_embedding(text) for text in new_memories]
-        )
-        if metadatas is None:
-            metadatas = [{} for _ in new_memories]
-        ids = [
-            metadata.get("id") or self.generate_id(embedding)
-            for metadata, embedding in zip(metadatas, embeddings)
-        ]
-        if isinstance(self.client, AsyncClient):
-            return await self.collection.upsert(
-                ids=ids,
-                embeddings=embeddings,
-                documents=new_memories,
-                metadatas=metadatas,
-            )
-        elif isinstance(self.client, Client):
-            return self.collection.upsert(
-                ids=ids,
-                embeddings=embeddings,
-                documents=new_memories,
-                metadatas=metadatas,
-            )
-        else:
-            raise Exception("Unknown client type")
-
-    async def remove(self, memories: list[str]):
-        self.collection = await self.get_or_create_collection()
-        if isinstance(self.client, AsyncClient):
-
-            retrieved = await asyncio.gather(
-                *[self.retrieve(memory) for memory in memories]
-            )
-            retrieved_distances = [r["distances"][0][0] for r in retrieved]
-            retrieved_ids = [r["ids"][0][0] for r in retrieved]
-            ids_to_remove = [
-                retrieved_id
-                for retrieved_id, retrieved_distance in zip(
-                    retrieved_ids, retrieved_distances
-                )
-                if retrieved_distance < 0.001
-            ]
-            return await self.remove_by_id(ids_to_remove)
-        else:
-            return super().remove(memories)
-
-    async def remove_by_id(self, ids=[]):
-        self.collection = await self.get_or_create_collection()
-        if isinstance(self.client, AsyncClient):
-            return await self.collection.delete(ids)
-        else:
-            return super().remove(ids)
-
-    async def reset(self):
-        self.collection = await self.get_or_create_collection()
-        if isinstance(self.client, AsyncClient):
-            return await self.client.delete_collection(name=self.collection.name)
-        return super().reset()
-
-    async def retrieve(self, task: str, filter=[]):
-        self.collection = await self.get_or_create_collection()
-        if isinstance(self.client, AsyncClient):
-            return await self.collection.query(
-                query_texts=[task], n_results=self.top_k, where=filter
-            )
-        return super().retrieve(task, filter)
-
-
-## TODO: Implement VectorDBMemory and GraphMemory Class that use MemoryTemplate
-
-
-### BaseMemory will be legacy once VectorDBMemory and GraphMemory Classes are created
 class BaseMemory(MemoryTemplate):
     """Retrieves top k memory items based on task. This is an in-house, unoptimised, vector db
     - Inputs:
@@ -395,9 +153,6 @@ class BaseMemory(MemoryTemplate):
         if not isinstance(memory_list, list):
             memory_list = [memory_list]
         self.memory.extend(memory_list)
-
-    def append_memory_list(self, new_memories, metadatas):
-        raise NotImplementedError("Not implemented, use append instead")
 
     def remove(self, memory_to_remove):
         """Removes a memory"""
@@ -547,3 +302,342 @@ class AsyncMemory(BaseMemory):
         )
         top_k_indices = res[f"top_{self.top_k}_list"]
         return [self.memory[index] for index in top_k_indices]
+
+######################
+## Chroma vector db ##
+######################
+
+## TODO: Make this non-OpenAI dependent
+    
+class BaseChromaDbMemory(MemoryTemplate, ABC):
+    ''' Takes in the following parameters:
+    `collection_name`: str. Compulsory. Name of the memory. Need to provide a unique name so that we can disambiguate between collections
+    `client` - Default: None. ChromaDB client to use, if any
+    `embedding_model`: Name of OpenAI's embedding_model to use with ChromaDB. Default OpenAI "text-embedding-3-small"
+    `top_k`: Number of elements to retrieve. Default: 3
+    `mapper`: Function. Maps the memory value to the embedded value. We do not need to embed the whole value, so this will serve as a way to tell us what to embed. Default: lambda x: x
+    `pre_delete`: Bool. Default: False. If set to True, delete collection with all data inside it when initialising'''
+
+    def __init__(self, collection_name, client=None, embedding_model="text-embedding-3-small", top_k=3, mapper=lambda x: x, pre_delete=False):
+        # Evaluate async client for chroma db for storage
+        self.client = client or chromadb.PersistentClient()
+        self.embedding_model = embedding_model
+        self.top_k = top_k
+        self.embedding_function = OpenAIEmbeddingFunction(
+            api_key=os.environ.get("OPENAI_API_KEY"), model_name=self.embedding_model
+        )
+        self.salt = os.urandom(16).hex()
+        self.collection_name = collection_name
+        self.mapper = mapper
+        self.collection = None
+        if pre_delete:
+            self.reset()
+        if isinstance(self.client, Client):
+            self.collection = self.client.get_or_create_collection(
+                self.collection_name, embedding_function=self.embedding_function
+            )
+       
+    @abstractmethod
+    def get_openai_client(self):
+        pass
+
+    @abstractmethod
+    def create_embedding(self, text):
+        pass
+
+    @abstractmethod
+    def get_or_create_collection(self):
+        pass
+
+    def remove(self, memories: list[str]):
+        if not isinstance(memories, list):
+            memories = [memories]
+        max_count = self.collection.count()
+        for memory in memories:
+            # retrieve up to top_k memories to remove
+            retrieved_ = self.collection.query(
+                query_texts=[memory], n_results = min(self.top_k, max_count)
+            )
+            removed = False
+            for document, retrieved_id in zip(retrieved_["documents"][0], retrieved_["ids"][0]):
+                # only remove on exact match
+                if document == memory:
+                    self.collection.delete([retrieved_id])
+                    print(f'Removing memory: {memory}')
+                    removed = True
+            if not removed:
+                print(f'No memory to remove: {memory}')
+
+        # for memory in memories:
+        #     retrieved_ = self.collection.query(
+        #         query_texts=[memory], n_results=self.top_k
+        #     )
+        #     retrieved_id = retrieved_["ids"][0][0]
+        #     retrieved_distance = retrieved_["distances"][0][0]
+        #     if retrieved_distance < 0.001:
+        #         self.collection.delete([retrieved_id])
+        # return True
+
+    def remove_by_id(self, ids):
+        if not isinstance(ids, list):
+            ids = [ids]
+        return self.collection.delete(ids)
+
+    def generate_id(self, embedding):
+        # Generate a unique ID based on the embedding with added salt
+        current_time = str(time.time()).encode()
+        salted_embedding = str(embedding).encode() + self.salt.encode() + current_time
+        return hashlib.sha256(salted_embedding).hexdigest()
+
+    def reset(self):
+        return self.client.delete_collection(name=self.collection.name)
+
+    def retrieve(self, task: str, filter=[]):
+        max_count = self.collection.count()
+        results = self.collection.query(
+        query_texts=[task], n_results=min(self.top_k, max_count), where=filter
+        )['metadatas'][0]
+
+        return [mem_item['taskgen_content'] if 'taskgen_content' in mem_item else mem_item for mem_item in results]
+        # return self.collection.query(
+        #     query_texts=[task], n_results=self.top_k, where=filter
+        # )
+
+
+class ChromaDbMemory(BaseChromaDbMemory):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.openai_client = self.get_openai_client()
+        self.collection = self.get_or_create_collection()
+
+    def get_openai_client(self):
+        from openai import OpenAI
+        return OpenAI()
+
+    def get_or_create_collection(self):
+        return self.client.get_or_create_collection(
+            self.collection_name, embedding_function=self.embedding_function
+        )
+
+    def add_file(self, filepath, text_splitter=None):
+        new_memories = self.read_file(filepath, text_splitter)
+        return self.append(new_memories, mapper=lambda x: x["content"])
+
+    def create_embedding(self, text):
+        return (
+            self.openai_client.embeddings.create(
+                input=[text], model=self.embedding_model
+            )
+            .data[0]
+            .embedding
+        )
+
+    def append(self, new_memories, mapper=None):
+        if not isinstance(new_memories, list):
+            new_memories = [new_memories]
+
+        if mapper:
+            memory_strings = [mapper(memory) for memory in new_memories]
+        else:
+            memory_strings = [self.mapper(memory) for memory in new_memories]
+        
+        if all(isinstance(item, dict) for item in new_memories):
+            metadatas = new_memories
+        else:
+            metadatas = [{"taskgen_content": item} for item in new_memories]
+        
+        return self.append_memory_list(memory_strings, metadatas)
+        # if not isinstance(new_memories, list):
+        #     new_memories = [new_memories]
+
+        # if mapper:
+        #     memory_strings = [mapper(memory) for memory in new_memories]
+        # else:
+        #     memory_strings = [self.mapper(memory) for memory in new_memories]
+        # if all(isinstance(item, dict) for item in new_memories):
+        #     metadatas = new_memories
+        # else:
+        #     metadatas = [{"content": item} for item in new_memories]
+        # return self.append_memory_list(memory_strings, metadatas)
+
+    def append_memory_list(self, new_memories: list[str], metadatas: list[dict] = None):
+        embeddings = [self.create_embedding(text) for text in new_memories]
+        if metadatas is None:
+            metadatas = [{} for _ in new_memories]
+        ids = [
+            metadata.get("id") or self.generate_id(embedding)
+            for metadata, embedding in zip(metadatas, embeddings)
+        ]
+        return self.collection.upsert(
+            ids=ids,
+            embeddings=embeddings,
+            documents=new_memories,
+            metadatas=metadatas,
+        )
+
+
+class AsyncChromaDbMemory(BaseChromaDbMemory):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.openai_client = self.get_openai_client()
+
+    def get_openai_client(self):
+        from openai import AsyncOpenAI
+        return AsyncOpenAI()
+
+    async def get_or_create_collection(self):
+        if self.collection:
+            return self.collection
+        if isinstance(self.client, Client):
+            return self.client.get_or_create_collection(
+                self.collection_name, embedding_function=self.embedding_function
+            )
+        elif isinstance(self.client, AsyncClient):
+            return await self.client.get_or_create_collection(
+                self.collection_name, embedding_function=self.embedding_function
+            )
+
+    async def add_file(self, filepath, text_splitter=None):
+        new_memories = self.read_file(filepath, text_splitter)
+        return await self.append(new_memories, mapper=lambda x: x["content"])
+
+    async def create_embedding(self, text):
+        embedding = await self.openai_client.embeddings.create(
+            input=[text], model=self.embedding_model
+        )
+        return embedding.data[0].embedding
+
+    async def append(self, new_memories=[], mapper=None):
+        if not isinstance(new_memories, list):
+            new_memories = [new_memories]
+
+        if mapper:
+            memory_strings = [mapper(memory) for memory in new_memories]
+        else:
+            memory_strings = [self.mapper(memory) for memory in new_memories]
+        
+        if all(isinstance(item, dict) for item in new_memories):
+            metadatas = new_memories
+        else:
+            metadatas = [{"taskgen_content": item} for item in new_memories]
+        
+        return await self.append_memory_list(memory_strings, metadatas)
+    
+        # if not isinstance(new_memories, list):
+        #     new_memories = [new_memories]
+        # if mapper:
+        #     memory_strings = [mapper(memory) for memory in new_memories]
+        # else:
+        #     memory_strings = [self.mapper(memory) for memory in new_memories]
+        # if all(isinstance(item, dict) for item in new_memories):
+        #     metadatas = new_memories
+        # else:
+        #     metadatas = [{"content": item} for item in new_memories]
+        # return await self.append_memory_list(memory_strings, metadatas)
+
+    async def append_memory_list(
+        self, new_memories: list[str], metadatas: list[dict] = None
+    ):
+        self.collection = await self.get_or_create_collection()
+        embeddings = await asyncio.gather(
+            *[self.create_embedding(text) for text in new_memories]
+        )
+        if metadatas is None:
+            metadatas = [{} for _ in new_memories]
+        ids = [
+            metadata.get("id") or self.generate_id(embedding)
+            for metadata, embedding in zip(metadatas, embeddings)
+        ]
+        if isinstance(self.client, AsyncClient):
+            return await self.collection.upsert(
+                ids=ids,
+                embeddings=embeddings,
+                documents=new_memories,
+                metadatas=metadatas,
+            )
+        elif isinstance(self.client, Client):
+            return self.collection.upsert(
+                ids=ids,
+                embeddings=embeddings,
+                documents=new_memories,
+                metadatas=metadatas,
+            )
+        else:
+            raise Exception("Unknown client type")
+
+    async def remove(self, memories: list[str]):
+        self.collection = await self.get_or_create_collection()
+        if isinstance(self.client, AsyncClient):
+            if not isinstance(memories, list):
+                memories = [memories]
+            max_count = self.collection.count()
+            n_results_num = min(self.top_k, max_count)
+            for memory in memories:
+                # retrieve up to top_k memories to remove
+                retrieved_ = await self.collection.query(
+                    query_texts=[memory], n_results = n_results_num
+                )
+                removed = False
+                for document, retrieved_id in zip(retrieved_["documents"][0], retrieved_["ids"][0]):
+                    # only remove on exact match
+                    if document == memory:
+                        await self.collection.delete([retrieved_id])
+                        print(f'Removing memory: {memory}')
+                        removed = True
+                if not removed:
+                    print(f'No memory to remove: {memory}')
+        else:
+            return super().remove(memories)
+
+        # self.collection = await self.get_or_create_collection()
+        # if isinstance(self.client, AsyncClient):
+
+        #     retrieved = await asyncio.gather(
+        #         *[self.retrieve(memory) for memory in memories]
+        #     )
+        #     retrieved_distances = [r["distances"][0][0] for r in retrieved]
+        #     retrieved_ids = [r["ids"][0][0] for r in retrieved]
+        #     ids_to_remove = [
+        #         retrieved_id
+        #         for retrieved_id, retrieved_distance in zip(
+        #             retrieved_ids, retrieved_distances
+        #         )
+        #         if retrieved_distance < 0.001
+        #     ]
+        #     return await self.remove_by_id(ids_to_remove)
+        # else:
+        #     return super().remove(memories)
+
+    async def remove_by_id(self, ids=[]):
+        self.collection = await self.get_or_create_collection()
+        if isinstance(self.client, AsyncClient):
+            return await self.collection.delete(ids)
+        else:
+            return super().remove(ids)
+
+    async def reset(self):
+        self.collection = await self.get_or_create_collection()
+        if isinstance(self.client, AsyncClient):
+            return await self.client.delete_collection(name=self.collection.name)
+        return super().reset()
+
+    async def retrieve(self, task: str, filter=[]):
+        self.collection = await self.get_or_create_collection()
+        if isinstance(self.client, AsyncClient):
+            max_count = self.collection.count()
+            n_results_num = min(self.top_k, max_count)
+            results = await self.collection.query(
+            query_texts=[task], n_results = n_results_num, where=filter
+            )['metadatas'][0]
+
+            return [mem_item['taskgen_content'] if 'taskgen_content' in mem_item else mem_item for mem_item in results]
+        
+        else:
+            return super().retrieve(task, filter)
+
+        # self.collection = await self.get_or_create_collection()
+        # if isinstance(self.client, AsyncClient):
+        #     return await self.collection.query(
+        #         query_texts=[task], n_results=self.top_k, where=filter
+        #     )
+        # return super().retrieve(task, filter)

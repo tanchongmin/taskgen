@@ -1,3 +1,8 @@
+5 Aug 2024 (v3.3.3)
+- Refined ChromaDB Memory (credit: Prince Saroj)
+- Added asyncio and chromadb dependency
+- Refined Tutorial 3 to better illustrated how to use the various memory types
+
 29 Jul 2024 (v3.3.2)
 - Added ChromaDB Memory to use VectorDB for insertion and retrieval of memories (credit: Prince Saroj)
 
