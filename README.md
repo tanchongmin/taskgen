@@ -1,5 +1,6 @@
 # TaskGen v3.3.3
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
+### Officially supported by Simbian AI (https://simbian.ai/)
 - Paper: https://web3.arxiv.org/pdf/2407.15734
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
 - Video (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
