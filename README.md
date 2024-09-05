@@ -2,17 +2,18 @@
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 #### An Open Source Initiative Led by John Tan Chong Min, Supported by Simbian AI (www.simbian.ai)
 
+![TaskGen Overview](./resources/TaskGen_Overview.png)
+
 - Discussion Channel (John's AI Group): [https://discord.gg/bzp87AHJy5](https://discord.gg/bzp87AHJy5)
 - Paper: https://web3.arxiv.org/pdf/2407.15734
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
+  
 - Video (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
 - Video (Part 2): https://www.youtube.com/watch?v=OWk7moRfTPE
 - TaskGen Ask Me Anything: https://www.youtube.com/watch?v=mheIWKugqF4
 
 ### Creator's Preamble
 Happy to share that the task-based agentic framework I have been working on - TaskGen - is largely complete! 
-
-![TaskGen Overview](./resources/TaskGen_Overview.png)
 
 Noteable features include:
 - Splitting of Tasks into subtasks for bite-sized solutions for each subtask
