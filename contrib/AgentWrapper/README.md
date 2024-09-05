@@ -8,3 +8,5 @@ We are looking for:
 - MultiAgentWrappers: How multiple agents can converse with one another
 
 Any other Wrapper is fine. This helps to expand upon the characteristics of the Agent without changing the base code.
+
+If it is good and sufficiently used by others, it will be ported over to the main TaskGen repo with acknowledgement of you as the author :)
