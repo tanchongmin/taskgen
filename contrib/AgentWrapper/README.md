@@ -3,6 +3,7 @@ This contains all the wrappers that gives additional functionalities to the base
 We are looking for:
 - PlanningWrappers: How to plan and execute the plan, self-correct plan if there are any errors
 - ReflectionWrappers: How to reflect upon what has been learned during task / across task and consolidate info for the next task
+- VerifierWrappers: How to verify agent's outputs and correct them accordingly
 - ConversationWrappers: How to converse with the agent
 - MultiAgentWrappers: How multiple agents can converse with one another
 
