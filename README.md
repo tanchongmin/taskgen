@@ -33,10 +33,11 @@ I am quite sure that this is the best open-source agentic framework for task-bas
 Existing frameworks like AutoGen rely too much on conversational text which is lengthy and not targeted.
 TaskGen uses StrictJSON (JSON parser with type checking and more!) as the core, and agents are efficient and are able to do Chain of Thought natively using JSON keys and descriptions as a guide.
 
-What can you do to help: 
+What can you do to help (see contrib folder for more details): 
 - Star the github so more people can use it (It's open source and free to use, even commercially!)
-- Contribute your favourite external function integrations so that it can be much more boilerplate for others to use :)
-- Contribute template Jupyter Notebooks for your favourite use cases :)
+- Contribute template Jupyter Notebooks for your favourite use cases so it can be much more boilerplate for others to use :)
+- Contribute Agent Wrappers that imbue additional functions to the base agent (e.g Planner, Reflector, Conversation)
+- Contribute Memory classes that allow the Agent to store and extract various kinds of memories according to the task
 
 I can't wait to see what this new framework can do for you!
 
