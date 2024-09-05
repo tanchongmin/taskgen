@@ -9,4 +9,6 @@ We are looking for:
 
 Any other Wrapper is fine. This helps to expand upon the characteristics of the Agent without changing the base code.
 
+See `ExampleWrapper.py` for an example of what the Notebook should contain
+
 If it is good and sufficiently used by others, it will be ported over to the main TaskGen repo with acknowledgement of you as the author :)
