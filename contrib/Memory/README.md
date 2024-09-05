@@ -2,6 +2,7 @@ This enables contributes for various types of memory for the Agent
 
 All kinds of memory must implement the MemoryTemplate base class. See memory.py for example
 
+```python
 class MemoryTemplate(ABC):
     """A generic template provided for all memories"""
 
@@ -29,3 +30,4 @@ class MemoryTemplate(ABC):
     def add_file(self, filepath, text_splitter=None):
         """Adds a file to the memory"""
         pass
+```
