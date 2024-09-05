@@ -13,7 +13,6 @@ class MemoryTemplate(ABC):
         """Appends multiple new memories"""
         pass
 
-    # TODO Should this be deleted based on metadata key - value filter
     @abstractmethod
     def remove(self, existing_memory):
         """Removes an existing_memory. existing_memory can be str, or triplet if it is a Knowledge Graph"""
