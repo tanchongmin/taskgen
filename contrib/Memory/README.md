@@ -1,6 +1,6 @@
-This enables contributes for various types of memory for the Agent
+This enables contributions for various types of memory for the Agent
 
-All kinds of memory must implement the MemoryTemplate base class. See memory.py for example.
+All kinds of memory must implement the MemoryTemplate base class. See `ExampleMemory.ipynb` for example.
 
 Contribute in the form of a Jupyter Notebook implementing the Memory class. If it is good and sufficiently used by others, it will be ported over to the main TaskGen repo with acknowledgement of you as the author :)
 
