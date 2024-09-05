@@ -48,12 +48,8 @@ class MemoryTemplate(ABC):
     def retrieve(self, task: str):
         """Retrieves some memories according to task"""
         pass
-
-    @abstractmethod
-    def add_file(self, filepath, text_splitter=None):
-        """Adds a file to the memory"""
-        pass
-
+    
+    ## Some utility functions
     def read_file(self, filepath, text_splitter=None):
         if ".xls" in filepath:
             text = pd.read_excel(filepath).to_string()
@@ -309,7 +305,7 @@ class AsyncMemory(BaseMemory):
 
 ## TODO: Make this non-OpenAI dependent
     
-class BaseChromaDbMemory(MemoryTemplate, ABC):
+class BaseChromaDbMemory(MemoryTemplate):
     ''' Takes in the following parameters:
     `collection_name`: str. Compulsory. Name of the memory. Need to provide a unique name so that we can disambiguate between collections
     `client` - Default: None. ChromaDB client to use, if any
@@ -367,16 +363,6 @@ class BaseChromaDbMemory(MemoryTemplate, ABC):
                     removed = True
             if not removed:
                 print(f'No memory to remove: {memory}')
-
-        # for memory in memories:
-        #     retrieved_ = self.collection.query(
-        #         query_texts=[memory], n_results=self.top_k
-        #     )
-        #     retrieved_id = retrieved_["ids"][0][0]
-        #     retrieved_distance = retrieved_["distances"][0][0]
-        #     if retrieved_distance < 0.001:
-        #         self.collection.delete([retrieved_id])
-        # return True
 
     def remove_by_id(self, ids):
         if not isinstance(ids, list):
@@ -447,18 +433,6 @@ class ChromaDbMemory(BaseChromaDbMemory):
             metadatas = [{"taskgen_content": item} for item in new_memories]
         
         return self.append_memory_list(memory_strings, metadatas)
-        # if not isinstance(new_memories, list):
-        #     new_memories = [new_memories]
-
-        # if mapper:
-        #     memory_strings = [mapper(memory) for memory in new_memories]
-        # else:
-        #     memory_strings = [self.mapper(memory) for memory in new_memories]
-        # if all(isinstance(item, dict) for item in new_memories):
-        #     metadatas = new_memories
-        # else:
-        #     metadatas = [{"content": item} for item in new_memories]
-        # return self.append_memory_list(memory_strings, metadatas)
 
     def append_memory_list(self, new_memories: list[str], metadatas: list[dict] = None):
         embeddings = [self.create_embedding(text) for text in new_memories]
@@ -522,18 +496,6 @@ class AsyncChromaDbMemory(BaseChromaDbMemory):
             metadatas = [{"taskgen_content": item} for item in new_memories]
         
         return await self.append_memory_list(memory_strings, metadatas)
-    
-        # if not isinstance(new_memories, list):
-        #     new_memories = [new_memories]
-        # if mapper:
-        #     memory_strings = [mapper(memory) for memory in new_memories]
-        # else:
-        #     memory_strings = [self.mapper(memory) for memory in new_memories]
-        # if all(isinstance(item, dict) for item in new_memories):
-        #     metadatas = new_memories
-        # else:
-        #     metadatas = [{"content": item} for item in new_memories]
-        # return await self.append_memory_list(memory_strings, metadatas)
 
     async def append_memory_list(
         self, new_memories: list[str], metadatas: list[dict] = None
@@ -589,25 +551,6 @@ class AsyncChromaDbMemory(BaseChromaDbMemory):
         else:
             return super().remove(memories)
 
-        # self.collection = await self.get_or_create_collection()
-        # if isinstance(self.client, AsyncClient):
-
-        #     retrieved = await asyncio.gather(
-        #         *[self.retrieve(memory) for memory in memories]
-        #     )
-        #     retrieved_distances = [r["distances"][0][0] for r in retrieved]
-        #     retrieved_ids = [r["ids"][0][0] for r in retrieved]
-        #     ids_to_remove = [
-        #         retrieved_id
-        #         for retrieved_id, retrieved_distance in zip(
-        #             retrieved_ids, retrieved_distances
-        #         )
-        #         if retrieved_distance < 0.001
-        #     ]
-        #     return await self.remove_by_id(ids_to_remove)
-        # else:
-        #     return super().remove(memories)
-
     async def remove_by_id(self, ids=[]):
         self.collection = await self.get_or_create_collection()
         if isinstance(self.client, AsyncClient):
@@ -634,10 +577,3 @@ class AsyncChromaDbMemory(BaseChromaDbMemory):
         
         else:
             return super().retrieve(task, filter)
-
-        # self.collection = await self.get_or_create_collection()
-        # if isinstance(self.client, AsyncClient):
-        #     return await self.collection.query(
-        #         query_texts=[task], n_results=self.top_k, where=filter
-        #     )
-        # return super().retrieve(task, filter)

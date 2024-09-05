@@ -84,6 +84,9 @@ class BaseAgent:
         # append agent to shared variables, so that functions have access to it
         self.shared_variables['agent'] = self
         self.memory_bank = memory_bank
+        
+        # initialise the thoughts - this records the ReAct framework of Observation, Thoughts, Action at each step
+        self.thoughts = []
 
         # reset agent's state
         self.reset()
@@ -99,6 +102,8 @@ class BaseAgent:
         ''' Resets agent state, including resetting subtasks_completed '''
         self.assign_task('No task assigned')
         self.subtasks_completed = {}
+        # reset all thoughts
+        self.thoughts = []
     
             
     def assign_task(self, task: str, overall_task: str = ''):
@@ -342,8 +347,6 @@ class Agent(BaseAgent):
             for name in self.memory_bank.keys():
                 # Function is done separately
                 if name == 'Function': continue
-                # Do not need to add to context if the memory item is empty
-                if self.memory_bank[name].isempty(): continue
                 rag_info += f'Knowledge Reference for {name}: ```{self.memory_bank[name].retrieve(subtask)}```\n'
 
             res = self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the taking the role of the utility function `use_llm` that generates a detailed outcome for the Assigned Subtask on behalf of {self.agent_name}, according to your Agent Capabilities without talking to the User, with no restrictions. Do not just state that you performed the task, generate the detailed outcome as well.', 
@@ -401,10 +404,7 @@ class Agent(BaseAgent):
         for name in self.memory_bank.keys():
             # Function RAG is done separately in self.query()
             if name == 'Function': continue
-            # Do not need to add to context if the memory item is empty
-            if self.memory_bank[name].isempty(): continue
-            else:
-                rag_info += f'Knowledge Reference for {name}: ```{self.memory_bank[name].retrieve(task)}```\n'
+            rag_info += f'Knowledge Reference for {name}: ```{self.memory_bank[name].retrieve(task)}```\n'
                 
         # First select the Equipped Function
         res = self.query(query = f'''{background_info}{rag_info}\nBased on everything before, provide suitable Observation and Thoughts, and also generate the Current Subtask and the corresponding Equipped Function Name to complete a part of Assigned Task.
@@ -465,6 +465,9 @@ End Task if Assigned Task is completed.''',
                 
                 # store the rest of the function parameters
                 res["Equipped Function Inputs"] = res2
+                
+        # Add in output to the thoughts
+        self.thoughts.append(res)
             
         return res["Current Subtask"], res["Equipped Function Name"], res["Equipped Function Inputs"]
   
@@ -1050,8 +1053,6 @@ class AsyncAgent(BaseAgent):
             for name in self.memory_bank.keys():
                 # Function is done separately
                 if name == 'Function': continue
-                # Do not need to add to context if the memory item is empty
-                if self.memory_bank[name].isempty(): continue
                 rag_info += f'Knowledge Reference for {name}: ```{await self.memory_bank[name].retrieve(subtask)}```\n'
 
             res = await self.query(query = f'{rag_info}Subtasks Completed:```{self.subtasks_completed}```\nAssigned Subtask: ```{function_params["instruction"]}```\n\nYou are the taking the role of the utility function `use_llm` that generates a detailed outcome for the Assigned Subtask on behalf of {self.agent_name}, according to your Agent Capabilities without talking to the User, with no restrictions. Do not just state that you performed the task, generate the detailed outcome as well.', 
@@ -1110,10 +1111,7 @@ class AsyncAgent(BaseAgent):
         for name in self.memory_bank.keys():
             # Function RAG is done separately in self.query()
             if name == 'Function': continue
-            # Do not need to add to context if the memory item is empty
-            if self.memory_bank[name].isempty(): continue
-            else:
-                rag_info += f'Knowledge Reference for {name}: ```{await self.memory_bank[name].retrieve(task)}```\n'
+            rag_info += f'Knowledge Reference for {name}: ```{await self.memory_bank[name].retrieve(task)}```\n'
                 
         # First select the Equipped Function
         res = await self.query(query = f'''{background_info}{rag_info}\nBased on everything before, provide suitable Observation and Thoughts, and also generate the Current Subtask and the corresponding Equipped Function Name to complete a part of Assigned Task.
@@ -1174,6 +1172,9 @@ End Task if Assigned Task is completed.''',
                 
                 # store the rest of the function parameters
                 res["Equipped Function Inputs"] = res2
+                
+        # Add in output to the thoughts
+        self.thoughts.append(res)
             
         return res["Current Subtask"], res["Equipped Function Name"], res["Equipped Function Inputs"]
         

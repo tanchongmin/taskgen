@@ -40,7 +40,6 @@ class Ranker(BaseRanker):
             return embedding
         
 class AsyncRanker(BaseRanker):
-    
     async def __call__(self, query, key) -> float:
         query, key = str(query), str(key)
         if self.ranking_fn is None:

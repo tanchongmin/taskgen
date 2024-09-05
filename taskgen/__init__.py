@@ -4,7 +4,7 @@ from .memory import *
 from .ranker import *
 from .function import *
 from .agent import *
-from .conversation import *
+from .wrapper import *
 
 __all__ = [
     "strict_json",
@@ -18,6 +18,7 @@ __all__ = [
     "chat_async",
     "Ranker",
     "ConversableAgent",
+    "ConversationWrapper",
     "AsyncRanker",
     "Memory",
     "MemoryTemplate",
