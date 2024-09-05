@@ -27,9 +27,4 @@ class MemoryTemplate(ABC):
     def retrieve(self, task: str):
         """Retrieves some memories according to task"""
         pass
-
-    @abstractmethod
-    def add_file(self, filepath, text_splitter=None):
-        """Adds a file to the memory"""
-        pass
 ```
