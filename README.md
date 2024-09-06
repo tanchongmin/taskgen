@@ -4,6 +4,7 @@
 
 ![TaskGen Overview](./resources/TaskGen_Overview.png)
 
+- How to contribute to TaskGen: https://www.youtube.com/watch?v=BqLeA13n6KI
 - Discussion Channel (John's AI Group): [https://discord.gg/bzp87AHJy5](https://discord.gg/bzp87AHJy5)
 - Paper: https://web3.arxiv.org/pdf/2407.15734
 - Video: https://www.youtube.com/watch?v=F3usuxs2p1Y
