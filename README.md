@@ -5,6 +5,7 @@
 ![TaskGen Overview](./resources/TaskGen_Overview.png)
 
 - How to contribute to TaskGen: https://www.youtube.com/watch?v=BqLeA13n6KI
+- Documentation: https://taskgen.readthedocs.io/en/latest/taskgen/index.html
 - Discussion Channel (John's AI Group): [https://discord.gg/bzp87AHJy5](https://discord.gg/bzp87AHJy5)
 - Paper: https://web3.arxiv.org/pdf/2407.15734
 - Video: https://www.youtube.com/watch?v=F3usuxs2p1Y
@@ -50,6 +51,7 @@ I can't wait to see what this new framework can do for you!
 ### Creator Info
 - Created: 17 Feb 2024 by John Tan Chong Min
 - Co-developer / Lead Contributor: Prince Saroj
+- Lead Documentation: Brian Lim
 - Collaborators welcome
 
 ## How do I use this? 
