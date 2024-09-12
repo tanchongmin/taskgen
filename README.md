@@ -8,7 +8,7 @@
 - Discussion Channel (John's AI Group): [https://discord.gg/bzp87AHJy5](https://discord.gg/bzp87AHJy5)
 - Paper: https://web3.arxiv.org/pdf/2407.15734
 - Video: https://www.youtube.com/watch?v=F3usuxs2p1Y
-- Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson)
+- Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson) [Do help star this as well!]
 
 Other related videos:
 - TaskGen Details (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
