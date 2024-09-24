@@ -11,6 +11,7 @@
 - Video: https://www.youtube.com/watch?v=F3usuxs2p1Y
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson) [Do help star this as well!]
 
+Outreach / Consultancy Services:
 - As part of our outreach efforts, we are actively providing consultation services to integrate TaskGen into your production pipelines. Contact John (https://www.linkedin.com/in/john-chong-min-tan-94652288/) or Brian (https://www.linkedin.com/in/brianlimyisheng/) to schedule an appointment!
 
 Other related videos:
