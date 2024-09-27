@@ -272,7 +272,7 @@ output = await my_agent.run('Generate me a happy sentence with a number and a ba
 *"Because text is not enough"* - Anonymous
 
 - `shared_variables` is a dictionary, that is initialised in Agent (default empty dictionary), and can be referenced by any function of the agent (including Inner Agents and their functions)
-- This can be useful for non-text modalitiies (e.g. audio, pdfs, image) and lengthy text modalities, which we do not want to output into `subtasks_completed` directly
+- This can be useful for non-text modalities (e.g. audio, pdfs, image) and lengthy text modalities, which we do not want to output into `subtasks_completed` directly
 - To use, simply define an External Function with `shared_variables` as the first input variable, from which you can access and modify `shared_variables` directly
 - The agent will also be able to be self-referenced in the External Function via `shared_variables['agent']`, so you can change the agent's internal parameters via `shared_variables`
 - If the function has no output because the output is stored in `shared_variables`, the default return value will be `{'Status': 'Completed'}`
