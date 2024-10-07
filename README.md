@@ -10,7 +10,6 @@
 - Paper: https://web3.arxiv.org/pdf/2407.15734
 - Video: https://www.youtube.com/watch?v=F3usuxs2p1Y
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson) [Do help star this as well!]
-- Related Repositories: TaskGen Pro (General version of TaskGen) (https://github.com/tanchongmin/taskgen-pro) [Do help star this as well!]
 
 Other related videos:
 - TaskGen Details (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
