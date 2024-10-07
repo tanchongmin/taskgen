@@ -1,6 +1,6 @@
 # TaskGen v3.3.4
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
-#### An Open Source Initiative Led by [John Tan Chong Min](https://www.linkedin.com/in/john-chong-min-tan-94652288/), Supported by [Simbian AI](www.simbian.ai)
+#### An Open Source Initiative Led by [John Tan Chong Min](https://www.linkedin.com/in/john-chong-min-tan-94652288/), Supported by [Simbian AI](www.simbian.ai).
 
 ![TaskGen Overview](./resources/TaskGen_Overview.png)
 
@@ -51,7 +51,6 @@ I can't wait to see what this new framework can do for you!
 ### Creator Info
 - Created: 17 Feb 2024 by [John Tan Chong Min](https://www.linkedin.com/in/john-chong-min-tan-94652288/)
 - Co-developer / Lead Contributor: [Prince Saroj](https://www.linkedin.com/in/psaroj/)
-- Lead Documentation: [Brian Lim](https://www.linkedin.com/in/brianlimyisheng/)
 - TaskGen Paper Research Staff: [Prince Saroj](https://www.linkedin.com/in/psaroj/), [Hardik Maheshwari](https://www.linkedin.com/in/hardik1496/), [Bharat Runwal](https://www.linkedin.com/in/bharat-runwal-673144196/), [Brian Lim](https://www.linkedin.com/in/brianlimyisheng/), [Richard Cottrill](https://www.linkedin.com/in/richardc/)
 - TaskGen Mentors / Funders: [Ambuj Kumar](https://www.linkedin.com/in/ambujkumar/), [Alankrit Chona](https://www.linkedin.com/in/alankrit-chona-927875a7/), [Mehul Motani](https://www.linkedin.com/in/motani/)
 - Collaborators welcome
