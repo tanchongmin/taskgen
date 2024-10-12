@@ -4,17 +4,10 @@
 
 ![TaskGen Overview](./resources/TaskGen_Overview.png)
 
-- How to contribute to TaskGen: https://www.youtube.com/watch?v=BqLeA13n6KI
 - Discussion Channel (John's AI Group): [https://discord.gg/bzp87AHJy5](https://discord.gg/bzp87AHJy5)
-- Documentation (Credit: Brian Lim): https://taskgen.readthedocs.io/en/latest/taskgen/index.html
 - Paper: https://web3.arxiv.org/pdf/2407.15734
 - Video: https://www.youtube.com/watch?v=F3usuxs2p1Y
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson) [Do help star this as well!]
-
-Other related videos:
-- TaskGen Details (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
-- TaskGen Details (Part 2): https://www.youtube.com/watch?v=OWk7moRfTPE
-- TaskGen Ask Me Anything: https://www.youtube.com/watch?v=mheIWKugqF4
 
 ### Creator's Preamble
 Happy to share that the task-based agentic framework I have been working on - TaskGen - is largely complete! 
@@ -38,8 +31,6 @@ TaskGen uses StrictJSON (JSON parser with type checking and more!) as the core, 
 What can you do to help (see contrib folder for more details): 
 - Star the github so more people can use it (It's open source and free to use, even commercially!)
 - Contribute template Jupyter Notebooks for your favourite use cases so it can be much more boilerplate for others to use :)
-- Contribute Agent Wrappers that imbue additional functions to the base agent (e.g Planner, Reflector, Conversation)
-- Contribute Memory classes that allow the Agent to store and extract various kinds of memories according to the task
 
 I can't wait to see what this new framework can do for you!
 
@@ -343,25 +334,5 @@ agent = Agent('Inventory Manager',
 # Known Limitations
 - `gpt-3.5-turbo` is not that great with mathematical functions for Agents. Use `gpt-4o-mini` or better for more consistent results
 - `gpt-3.5-turbo` is not that great with Memory (Tutorial 3). Use `gpt-4o-mini` or better for more consistent results
-
-# Contributing to the project
-
-## Test locally
-1. Clone the repository
-2. If using a virtual environment, activate it
-3. `cd` into taskgen repository
-4. Install the package via command line `pip install -e .`
-5. Now you can import the package and use it in your code
-
-## Submitting a pull request
-1. Fork the repository
-2. Create a new branch
-3. Make your changes
-4. Push your changes to your fork
-5. Submit a pull request
-
-# What are we looking out for?
-1. Contributing example Agents and Functions. Agents can now be contributed easily using `agent.contribute_agent()` and the entire Agent code with all the functions and memory will be converted to text-based code and put on the TaskGen GitHub. Do share your use cases actively so that other people can benefit :) These Agents can be downloaded by others via `agent.load_community_agent(agent_name)`
-2. Jupyter Notebooks showcasing what could be done with the framework for something useful. Let your imagination guide you, we look forward to see what you create
 3. Other Known Limitations - Do test the framework out extensively and note its failure cases. We will see if we can address them, if not we will put them in Known Limitations.
 4. (For the prompt engineer). If you could find a better way to make the prompts work, let us know directly - we do need to test this out across all Tutorial Jupyter Notebooks to make sure that it really works with existing datasets. Also, if you are using other LLMs beside OpenAI, and find the prompts do not work as well - try to rejig your own prompts and let us know as well!
