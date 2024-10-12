@@ -30,7 +30,7 @@ TaskGen uses StrictJSON (JSON parser with type checking and more!) as the core, 
 
 What can you do to help (see contrib folder for more details): 
 - Star the github so more people can use it (It's open source and free to use, even commercially!)
-- Contribute template Jupyter Notebooks for your favourite use cases so it can be much more boilerplate for others to use :)
+- Contribute agents so it can be much more boilerplate for others to use :)
 
 I can't wait to see what this new framework can do for you!
 
