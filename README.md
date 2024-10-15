@@ -1,7 +1,6 @@
 # TaskGen v3.3.4
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 #### An Open Source Initiative Led by [John Tan Chong Min](https://www.linkedin.com/in/john-chong-min-tan-94652288/), Supported by [Simbian AI](www.simbian.ai).
-#### Note: As of 15 Oct 2024, John Tan Chong Min is no longer with Simbian and will be developing a more all-purpose branch of TaskGen in pursuit of his life dream of fast learning and adaptable agents, named [TaskGen Pro](https://github.com/tanchongmin/taskgen-pro).
 
 ![TaskGen Overview](./resources/TaskGen_Overview.png)
 
