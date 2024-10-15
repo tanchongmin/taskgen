@@ -1,6 +1,7 @@
 # TaskGen v3.3.4
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 #### An Open Source Initiative Led by [John Tan Chong Min](https://www.linkedin.com/in/john-chong-min-tan-94652288/), Supported by [Simbian AI](www.simbian.ai).
+#### Note: As of 15 Oct 2024, John Tan Chong Min is no longer with Simbian and will be developing a more all-purpose branch of TaskGen in pursuit of his life dream of fast learning and adaptable agents, named [TaskGen Pro](https://github.com/tanchongmin/taskgen-pro).
 
 ![TaskGen Overview](./resources/TaskGen_Overview.png)
 
@@ -28,10 +29,6 @@ I am quite sure that this is the best open-source agentic framework for task-bas
 Existing frameworks like AutoGen rely too much on conversational text which is lengthy and not targeted.
 TaskGen uses StrictJSON (JSON parser with type checking and more!) as the core, and agents are efficient and are able to do Chain of Thought natively using JSON keys and descriptions as a guide.
 
-What can you do to help (see contrib folder for more details): 
-- Star the github so more people can use it (It's open source and free to use, even commercially!)
-- Contribute agents so it can be much more boilerplate for others to use :)
-
 I can't wait to see what this new framework can do for you!
 
 ### Benefits of JSON messaging over agentic frameworks using conversational free-text like AutoGen
@@ -40,7 +37,7 @@ I can't wait to see what this new framework can do for you!
 - StrictJSON helps to ensure all output fields are there and of the right format required for downstream processing
 
 ### Creator Info
-- Created: 17 Feb 2024 by [John Tan Chong Min](https://www.linkedin.com/in/john-chong-min-tan-94652288/) as a personal project
+- Created: 17 Feb 2024 - 15 Oct 2024 by [John Tan Chong Min](https://www.linkedin.com/in/john-chong-min-tan-94652288/)
 - Co-developer / Lead Contributor: [Prince Saroj](https://www.linkedin.com/in/psaroj/)
 - TaskGen Paper Research Staff: [Prince Saroj](https://www.linkedin.com/in/psaroj/), [Hardik Maheshwari](https://www.linkedin.com/in/hardik1496/), [Bharat Runwal](https://www.linkedin.com/in/bharat-runwal-673144196/), [Brian Lim](https://www.linkedin.com/in/brianlimyisheng/), [Richard Cottrill](https://www.linkedin.com/in/richardc/)
 - TaskGen Mentors / Funders: [Ambuj Kumar](https://www.linkedin.com/in/ambujkumar/), [Alankrit Chona](https://www.linkedin.com/in/alankrit-chona-927875a7/), [Mehul Motani](https://www.linkedin.com/in/motani/)
