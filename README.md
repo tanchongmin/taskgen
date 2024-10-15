@@ -41,6 +41,9 @@ I can't wait to see what this new framework can do for you!
 - TaskGen Paper Research Staff: [Prince Saroj](https://www.linkedin.com/in/psaroj/), [Hardik Maheshwari](https://www.linkedin.com/in/hardik1496/), [Bharat Runwal](https://www.linkedin.com/in/bharat-runwal-673144196/), [Brian Lim](https://www.linkedin.com/in/brianlimyisheng/), [Richard Cottrill](https://www.linkedin.com/in/richardc/)
 - Collaborators welcome
 
+### Acknowledgements
+- Supported by Simbian AI from Feb 2024 to Oct 15, 2024
+
 ## How do I use this? 
 1. Download package via command line ```pip install taskgen-ai```
 2. Set up your LLM and provide any API keys if needed
