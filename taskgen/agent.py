@@ -586,7 +586,7 @@ End Task if Assigned Task is completed.''',
         if os.environ['GITHUB_TOKEN'] is None:
             raise Exception('Please set your GITHUB_TOKEN in the environment variables')
         
-        owner = "simbianai"
+        owner = "tanchongmin"
         repo = "taskgen"
 
         fork_url = self._create_taskgen_fork_for_user(owner, repo)
