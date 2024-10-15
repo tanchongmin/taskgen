@@ -1,3 +1,7 @@
+15 Oct 2024 (v4.0.0)
+- Official end date of creator, John Tan Chong Min, employment with Simbian AI
+- GitHub now under a personal account to encourage more open-sourced contributions
+
 6 Sep 2024 (v3.3.4)
 - Added contribution guide for Wrappers, Memory class, Jupyter Notebook in contrib folder
 - Removed `isempty` function usage for `Memory` class in `agent.py` because we do not need to check for this condition anymore if memory is always filled
