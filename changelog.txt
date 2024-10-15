@@ -1,5 +1,4 @@
 15 Oct 2024 (v4.0.0)
-- Official end date of creator, John Tan Chong Min, employment with Simbian AI
 - GitHub now under a personal account to encourage more open-sourced contributions
 
 6 Sep 2024 (v3.3.4)
