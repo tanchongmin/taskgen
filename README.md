@@ -1,23 +1,12 @@
-# TaskGen v4.0.0
+# TaskGen (Simbian) v3.3.4
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
-#### An Open Source Initiative Led by [John Tan Chong Min](https://www.linkedin.com/in/john-chong-min-tan-94652288/)
+### An Open Source Initiative Led by John Tan Chong Min, Supported by Simbian AI
 
 ![TaskGen Overview](./resources/TaskGen_Overview.png)
 
-- How to contribute to TaskGen: https://www.youtube.com/watch?v=BqLeA13n6KI
-- Discussion Channel (John's AI Group): [https://discord.gg/bzp87AHJy5](https://discord.gg/bzp87AHJy5)
-- Documentation (Credit: Brian Lim): https://taskgen.readthedocs.io/en/latest/taskgen/index.html
 - Paper: https://web3.arxiv.org/pdf/2407.15734
 - Video: https://www.youtube.com/watch?v=F3usuxs2p1Y
 - Related Repositories: StrictJSON (https://github.com/tanchongmin/strictjson) [Do help star this as well!]
-
-Other related videos:
-- TaskGen Details (Part 1): https://www.youtube.com/watch?v=O_XyTT7QGH4
-- TaskGen Details (Part 2): https://www.youtube.com/watch?v=OWk7moRfTPE
-- TaskGen Ask Me Anything: https://www.youtube.com/watch?v=mheIWKugqF4
-
-Outreach / Consultancy Services:
-- As part of our outreach efforts, we are actively providing consultation services to integrate TaskGen into your production pipelines. Contact [John](https://www.linkedin.com/in/john-chong-min-tan-94652288/) or [Brian](https://www.linkedin.com/in/brianlimyisheng/) or [Richard Cottrill](https://www.linkedin.com/in/richardc/) to schedule an appointment!
 
 ### Creator's Preamble
 Happy to share that the task-based agentic framework I have been working on - TaskGen - is largely complete! 
@@ -38,12 +27,6 @@ I am quite sure that this is the best open-source agentic framework for task-bas
 Existing frameworks like AutoGen rely too much on conversational text which is lengthy and not targeted.
 TaskGen uses StrictJSON (JSON parser with type checking and more!) as the core, and agents are efficient and are able to do Chain of Thought natively using JSON keys and descriptions as a guide.
 
-What can you do to help (see contrib folder for more details): 
-- Star the github so more people can use it (It's open source and free to use, even commercially!)
-- Contribute template Jupyter Notebooks for your favourite use cases so it can be much more boilerplate for others to use :)
-- Contribute Agent Wrappers that imbue additional functions to the base agent (e.g Planner, Reflector, Conversation)
-- Contribute Memory classes that allow the Agent to store and extract various kinds of memories according to the task
-
 I can't wait to see what this new framework can do for you!
 
 ### Benefits of JSON messaging over agentic frameworks using conversational free-text like AutoGen
@@ -52,17 +35,13 @@ I can't wait to see what this new framework can do for you!
 - StrictJSON helps to ensure all output fields are there and of the right format required for downstream processing
 
 ### Creator Info
-- Created: 17 Feb 2024 by [John Tan Chong Min](https://www.linkedin.com/in/john-chong-min-tan-94652288/)
-- Lead Contributor: [Prince Saroj](https://www.linkedin.com/in/psaroj/)
-- Lead Documentation: [Brian Lim](https://www.linkedin.com/in/brianlimyisheng/)
+- Created: 17 Feb 2024 - 15 Oct 2024 by [John Tan Chong Min](https://www.linkedin.com/in/john-chong-min-tan-94652288/)
+- Co-developer / Lead Contributor: [Prince Saroj](https://www.linkedin.com/in/psaroj/)
 - TaskGen Paper Research Staff: [Prince Saroj](https://www.linkedin.com/in/psaroj/), [Hardik Maheshwari](https://www.linkedin.com/in/hardik1496/), [Bharat Runwal](https://www.linkedin.com/in/bharat-runwal-673144196/), [Brian Lim](https://www.linkedin.com/in/brianlimyisheng/), [Richard Cottrill](https://www.linkedin.com/in/richardc/)
-- Collaborators welcome
-
-### Acknowledgements
-- Supported by Simbian from Feb 2024 to Oct 15, 2024
+- TaskGen Mentors / Funders: [Ambuj Kumar](https://www.linkedin.com/in/ambujkumar/), [Alankrit Chona](https://www.linkedin.com/in/alankrit-chona-927875a7/), [Mehul Motani](https://www.linkedin.com/in/motani/)
 
 ## How do I use this? 
-1. Download package via command line ```pip install taskgen-ai```
+1. Download package via command line ```pip install taskgen-ai==3.3.4```
 2. Set up your LLM and provide any API keys if needed
 3. Import the required functions from ```taskgen``` and use them!
 
@@ -349,25 +328,5 @@ agent = Agent('Inventory Manager',
 # Known Limitations
 - `gpt-3.5-turbo` is not that great with mathematical functions for Agents. Use `gpt-4o-mini` or better for more consistent results
 - `gpt-3.5-turbo` is not that great with Memory (Tutorial 3). Use `gpt-4o-mini` or better for more consistent results
-
-# Contributing to the project
-
-## Test locally
-1. Clone the repository
-2. If using a virtual environment, activate it
-3. `cd` into taskgen repository
-4. Install the package via command line `pip install -e .`
-5. Now you can import the package and use it in your code
-
-## Submitting a pull request
-1. Fork the repository
-2. Create a new branch
-3. Make your changes
-4. Push your changes to your fork
-5. Submit a pull request
-
-# What are we looking out for?
-1. Contributing example Agents and Functions. Agents can now be contributed easily using `agent.contribute_agent()` and the entire Agent code with all the functions and memory will be converted to text-based code and put on the TaskGen GitHub. Do share your use cases actively so that other people can benefit :) These Agents can be downloaded by others via `agent.load_community_agent(agent_name)`
-2. Jupyter Notebooks showcasing what could be done with the framework for something useful. Let your imagination guide you, we look forward to see what you create
 3. Other Known Limitations - Do test the framework out extensively and note its failure cases. We will see if we can address them, if not we will put them in Known Limitations.
 4. (For the prompt engineer). If you could find a better way to make the prompts work, let us know directly - we do need to test this out across all Tutorial Jupyter Notebooks to make sure that it really works with existing datasets. Also, if you are using other LLMs beside OpenAI, and find the prompts do not work as well - try to rejig your own prompts and let us know as well!
