@@ -2,7 +2,7 @@
 ### A Task-based agentic framework building on StrictJSON outputs by LLM agents
 ### An Open Source Initiative Led by [John Tan Chong Min](https://www.linkedin.com/in/john-chong-min-tan-94652288/)
 
-### NOTE: TaskGen repo is no longer mantained, as we are shifting over to [AgentJo](https://github.com/tanchongmin/agentjo)
+### NOTE: This TaskGen repo is no longer mantained, as we are shifting over to [AgentJo](https://github.com/tanchongmin/agentjo)
 - Human-Friendly, Fast Learning and Adaptable Agent Communities building on TaskGen
 - Do help star the new repo. See you there!
 
